@@ -50,7 +50,7 @@ class ArchiveResource extends Resource
                     ->hint(new HtmlString('<span class="text-sm text-gray-500">Kosongkan jika tidak diperlukan</span>')),
                 Forms\Components\Select::make('archive_category')
                     ->label('Kategori Arsip')
-                    ->options(fn (): array => static::getCategoryOptions())
+                    ->options(fn(): array => static::getCategoryOptions())
                     ->live()
                     ->afterStateUpdated(function (Set $set): void {
                         $set('business_references', []);
@@ -71,13 +71,13 @@ class ArchiveResource extends Resource
                     ->required(),
                 Forms\Components\Placeholder::make('business_reference_configuration_notice')
                     ->label('Status Referensi Bisnis')
-                    ->content(fn (Get $get): HtmlString => static::businessReferenceConfigurationNotice((int) ($get('archive_category') ?: 0)) ?? new HtmlString(''))
-                    ->hidden(fn (Get $get): bool => static::businessReferenceConfigurationNotice((int) ($get('archive_category') ?: 0)) === null)
+                    ->content(fn(Get $get): HtmlString => static::businessReferenceConfigurationNotice((int) ($get('archive_category') ?: 0)) ?? new HtmlString(''))
+                    ->hidden(fn(Get $get): bool => static::businessReferenceConfigurationNotice((int) ($get('archive_category') ?: 0)) === null)
                     ->columnSpanFull(),
                 FormSection::make('Referensi Bisnis')
-                    ->description(fn (Get $get): string => static::businessReferenceSectionDescription((int) ($get('archive_category') ?: 0)))
-                    ->schema(fn (Get $get): array => static::buildBusinessReferenceSchema((int) ($get('archive_category') ?: 0)))
-                    ->hidden(fn (Get $get): bool => static::businessReferenceFieldDefinitions((int) ($get('archive_category') ?: 0))->isEmpty())
+                    ->description(fn(Get $get): string => static::businessReferenceSectionDescription((int) ($get('archive_category') ?: 0)))
+                    ->schema(fn(Get $get): array => static::buildBusinessReferenceSchema((int) ($get('archive_category') ?: 0)))
+                    ->hidden(fn(Get $get): bool => static::businessReferenceFieldDefinitions((int) ($get('archive_category') ?: 0))->isEmpty())
                     ->columnSpanFull()
                     ->compact(),
                 Forms\Components\FileUpload::make('archive_path')
@@ -105,7 +105,7 @@ class ArchiveResource extends Resource
                     ->downloadable()
                     ->openable()
                     ->columnSpanFull()
-                    ->required(fn (string $operation): bool => $operation === 'create'),
+                    ->required(fn(string $operation): bool => $operation === 'create'),
             ]);
     }
 
@@ -131,16 +131,16 @@ class ArchiveResource extends Resource
                     ->limit(40),
                 Tables\Columns\TextColumn::make('primary_reference')
                     ->label('Referensi Utama')
-                    ->state(fn (Archive $record): string => static::primaryReferenceValue($record))
+                    ->state(fn(Archive $record): string => static::primaryReferenceValue($record))
                     ->searchable(false),
                 Tables\Columns\TextColumn::make('linkage_status')
                     ->label('Status Linkage')
-                    ->state(fn (Archive $record): string => static::archiveLinkageStatus($record)['label'])
+                    ->state(fn(Archive $record): string => static::archiveLinkageStatus($record)['label'])
                     ->badge()
-                    ->color(fn (Archive $record): string => static::archiveLinkageStatus($record)['color']),
+                    ->color(fn(Archive $record): string => static::archiveLinkageStatus($record)['color']),
                 Tables\Columns\TextColumn::make('archive_date')
                     ->label('Tanggal Arsip')
-                    ->formatStateUsing(fn ($state): string => static::formatDateValue($state))
+                    ->formatStateUsing(fn($state): string => static::formatDateValue($state))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Waktu Upload')
@@ -151,17 +151,17 @@ class ArchiveResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('archive_category')
                     ->label('Kategori Arsip')
-                    ->options(fn (): array => static::getCategoryOptions())
+                    ->options(fn(): array => static::getCategoryOptions())
                     ->searchable()
                     ->multiple()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('archive_branch_office')
                     ->label('Cabang')
-                    ->options(fn (): array => static::getBranchOptions())
+                    ->options(fn(): array => static::getBranchOptions())
                     ->searchable()
                     ->multiple()
                     ->preload()
-                    ->visible(fn (): bool => app(ArchiveVisibilityService::class)->canViewAllBranches(auth()->user())),
+                    ->visible(fn(): bool => app(ArchiveVisibilityService::class)->canViewAllBranches(auth()->user())),
                 Tables\Filters\Filter::make('reference_value')
                     ->label('Referensi Bisnis')
                     ->form([
@@ -191,7 +191,7 @@ class ArchiveResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->recordUrl(fn (Archive $record): string => static::getUrl('view', ['record' => $record]))
+            ->recordUrl(fn(Archive $record): string => static::getUrl('view', ['record' => $record]))
             ->defaultSort('created_at', 'desc');
     }
 
@@ -199,7 +199,8 @@ class ArchiveResource extends Resource
     {
         return $schema
             ->components([
-                Grid::make(1)
+                Grid::make(2)
+                    ->columnSpanFull()
                     ->schema([
                         InfolistSection::make('Informasi Arsip')
                             ->schema([
@@ -209,23 +210,23 @@ class ArchiveResource extends Resource
                                 TextEntry::make('branchOffice.branch_name')->label('Cabang')->placeholder('-'),
                                 TextEntry::make('archive_date')
                                     ->label('Tanggal Arsip')
-                                    ->formatStateUsing(fn ($state): string => static::formatDateValue($state)),
+                                    ->formatStateUsing(fn($state): string => static::formatDateValue($state)),
                                 TextEntry::make('archive_description')->label('Deskripsi'),
                                 TextEntry::make('linkage_status')
                                     ->label('Status Linkage')
-                                    ->state(fn (Archive $record): string => static::archiveLinkageStatus($record)['label'])
+                                    ->state(fn(Archive $record): string => static::archiveLinkageStatus($record)['label'])
                                     ->badge()
-                                    ->color(fn (Archive $record): string => static::archiveLinkageStatus($record)['color']),
+                                    ->color(fn(Archive $record): string => static::archiveLinkageStatus($record)['color']),
                                 TextEntry::make('business_references_html')
                                     ->label('Referensi Bisnis')
-                                    ->state(fn (Archive $record): HtmlString => static::renderBusinessReferenceHtml($record))
+                                    ->state(fn(Archive $record): HtmlString => static::renderBusinessReferenceHtml($record))
                                     ->html(),
                             ]),
                         InfolistSection::make('File Arsip')
                             ->schema([
                                 TextEntry::make('archive_preview')
                                     ->label('Preview')
-                                    ->state(fn (Archive $record): HtmlString => static::renderArchivePreviewHtml($record))
+                                    ->state(fn(Archive $record): HtmlString => static::renderArchivePreviewHtml($record))
                                     ->html(),
                             ]),
                     ]),
@@ -265,7 +266,7 @@ class ArchiveResource extends Resource
     {
         $count = static::getEloquentQuery()->count();
 
-        return $count >= 1000 ? number_format($count / 1000, 1).'k' : number_format($count, 0, ',', '.');
+        return $count >= 1000 ? number_format($count / 1000, 1) . 'k' : number_format($count, 0, ',', '.');
     }
 
     /**
@@ -328,8 +329,8 @@ class ArchiveResource extends Resource
             ->whereIn('id', $visibleBranchOfficeIds)
             ->orderBy('branch_code')
             ->get()
-            ->mapWithKeys(fn (BranchOffice $branch): array => [
-                $branch->id => trim($branch->branch_code.' - '.$branch->branch_name),
+            ->mapWithKeys(fn(BranchOffice $branch): array => [
+                $branch->id => trim($branch->branch_code . ' - ' . $branch->branch_name),
             ])
             ->all();
     }
@@ -357,7 +358,7 @@ class ArchiveResource extends Resource
         $record->loadMissing('businessReferences.categoryReferenceField');
 
         $primaryReference = $record->businessReferences
-            ->first(fn ($reference) => (bool) $reference->categoryReferenceField?->is_primary_match_key);
+            ->first(fn($reference) => (bool) $reference->categoryReferenceField?->is_primary_match_key);
 
         return $primaryReference?->raw_value ?: '-';
     }
@@ -376,7 +377,7 @@ class ArchiveResource extends Resource
         }
 
         $items = $record->businessReferences
-            ->sortBy(fn ($reference) => $reference->categoryReferenceField?->sort_order ?? 999)
+            ->sortBy(fn($reference) => $reference->categoryReferenceField?->sort_order ?? 999)
             ->map(function ($reference): string {
                 $label = e($reference->categoryReferenceField?->label ?? $reference->reference_type);
                 $value = e($reference->raw_value);
@@ -393,11 +394,11 @@ class ArchiveResource extends Resource
         };
 
         return new HtmlString(
-            "<div class=\"space-y-3\">".
-                "<div class=\"inline-flex items-center rounded-full px-3 py-1 text-xs font-medium {$badgeClass}\">".e($status['label']).'</div>'.
-                '<p class="text-sm text-gray-500">'.e($status['description']).'</p>'.
-                "<ul class=\"list-disc pl-4\">{$items}</ul>".
-            '</div>',
+            "<div class=\"space-y-3\">" .
+                "<div class=\"inline-flex items-center rounded-full px-3 py-1 text-xs font-medium {$badgeClass}\">" . e($status['label']) . '</div>' .
+                '<p class="text-sm text-gray-500">' . e($status['description']) . '</p>' .
+                "<ul class=\"list-disc pl-4\">{$items}</ul>" .
+                '</div>',
         );
     }
 
@@ -440,8 +441,8 @@ class ArchiveResource extends Resource
         }
 
         return new HtmlString(
-            'Kategori ini sudah masuk scope target dan realisasi, tetapi field referensi bisnis belum aktif. '.
-            'Jalankan <code>php artisan db:seed --class=BusinessReferenceConfigurationSeeder --force</code> di environment target.',
+            'Kategori ini sudah masuk scope target dan realisasi, tetapi field referensi bisnis belum aktif. ' .
+                'Jalankan <code>php artisan db:seed --class=BusinessReferenceConfigurationSeeder --force</code> di environment target.',
         );
     }
 

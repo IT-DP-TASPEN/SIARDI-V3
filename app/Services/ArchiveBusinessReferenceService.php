@@ -92,6 +92,97 @@ class ArchiveBusinessReferenceService
     }
 
     /**
+     * @param  array<int|string, mixed>  $submittedReferences
+     * @return array<string, string>
+     */
+    public function validateReferencesForArchive(Archive $archive, array $submittedReferences): array
+    {
+        $archive->loadMissing(['category', 'branchOffice.dwhMapping']);
+
+        $fields = $this->getFieldDefinitionsForCategory($archive->archive_category)->keyBy('id');
+
+        if ($fields->isEmpty()) {
+            return [];
+        }
+
+        $primaryField = $fields->firstWhere('is_primary_match_key', true);
+
+        if (! $primaryField) {
+            return [];
+        }
+
+        $normalizedValues = $fields->mapWithKeys(function (CategoryReferenceField $field) use ($submittedReferences): array {
+            $rawValue = trim((string) ($submittedReferences[$field->id] ?? ''));
+
+            if ($rawValue === '') {
+                return [$field->id => null];
+            }
+
+            return [
+                $field->id => ReferenceNormalizer::normalize(
+                    $rawValue,
+                    $field->normalizer ?? 'uppercase_compact',
+                ),
+            ];
+        });
+
+        $primaryNormalizedValue = $normalizedValues->get($primaryField->id);
+
+        if (! filled($primaryNormalizedValue)) {
+            return [];
+        }
+
+        $dwhMapping = $archive->branchOffice?->dwhMapping;
+
+        if (! ($dwhMapping?->is_active)) {
+            return [
+                "referenceInputs.{$primaryField->id}" => 'Cabang arsip ini belum punya mapping target aktif.',
+            ];
+        }
+
+        $matchedCandidate = $this->dwhCoverageRepository->findExactReferenceCandidate(
+            $primaryField,
+            $primaryNormalizedValue,
+            $dwhMapping->dwh_location_code,
+        );
+
+        if (! $matchedCandidate) {
+            return [
+                "referenceInputs.{$primaryField->id}" => 'Referensi utama tidak ditemukan pada data target cabang ini.',
+            ];
+        }
+
+        $errors = [];
+
+        foreach ($fields as $field) {
+            if ($field->id === $primaryField->id) {
+                continue;
+            }
+
+            $submittedNormalizedValue = $normalizedValues->get($field->id);
+
+            if (! filled($submittedNormalizedValue)) {
+                continue;
+            }
+
+            if (! array_key_exists($field->reference_type, $matchedCandidate['reference_values'])) {
+                continue;
+            }
+
+            $matchedNormalizedValue = ReferenceNormalizer::normalize(
+                (string) ($matchedCandidate['reference_values'][$field->reference_type] ?? ''),
+                $field->normalizer ?? 'uppercase_compact',
+            );
+
+            if ($submittedNormalizedValue !== $matchedNormalizedValue) {
+                $errors["referenceInputs.{$field->id}"] = "{$field->label} tidak cocok dengan data target untuk referensi utama ini.";
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
      * @return array<string, string>
      */
     public function getLegacySuggestions(Archive $archive): array
@@ -120,6 +211,10 @@ class ArchiveBusinessReferenceService
             ->all();
 
         if ($filters === [] || ! ($archive->category instanceof Category)) {
+            return collect();
+        }
+
+        if (! ($archive->branchOffice?->dwhMapping?->is_active)) {
             return collect();
         }
 

@@ -208,6 +208,33 @@ class DwhCoverageRepository
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function findExactReferenceCandidate(CategoryReferenceField $field, string $normalizedValue, ?string $dwhLocationCode = null): ?array
+    {
+        $category = $field->category;
+        $definition = $category ? $this->resolveDefinition($category) : null;
+
+        if (! $category || $definition === null) {
+            return null;
+        }
+
+        $column = $definition['reference_columns'][$field->reference_type] ?? null;
+
+        if ($column === null) {
+            return null;
+        }
+
+        return $this->mapCandidateRows(
+            $this->buildCandidateQuery($category, $dwhLocationCode)
+                ->whereRaw("{$this->normalizedSql($column)} = ?", [$normalizedValue])
+                ->limit(1)
+                ->get(),
+            $definition,
+        )->first();
+    }
+
+    /**
      * @param  array<string, string>  $filters
      * @return Collection<int, array<string, mixed>>
      */

@@ -145,6 +145,9 @@
                     Pilih arsip dari antrian kiri untuk mulai melakukan linking referensi bisnis.
                 </div>
             @else
+                @php
+                    $canValidateAgainstTarget = (bool) $selectedArchive->branchOffice?->dwhMapping?->is_active;
+                @endphp
                 <div class="siardi-workspace-stack">
                     <div class="siardi-surface-card">
                         <div class="siardi-panel-split">
@@ -163,7 +166,7 @@
                                     </x-filament::badge>
                                     @if ($selectedArchive->branchOffice?->dwhMapping?->is_active)
                                         <x-filament::badge color="success">
-                                            Kode Target {{ $selectedArchive->branchOffice->dwhMapping->dwh_location_code }}
+                                            {{ $selectedArchive->branchOffice->dwhMapping->dwh_location_code }}
                                         </x-filament::badge>
                                     @else
                                         <x-filament::badge color="warning">Tanpa Mapping Cabang Aktif</x-filament::badge>
@@ -184,9 +187,9 @@
                             Kategori ini belum memiliki konfigurasi referensi bisnis. Arsip tetap aman sebagai legacy document, tetapi belum bisa dilink ke target dan realisasi sampai konfigurasi field diaktifkan.
                         </div>
                     @else
-                        @if (! $selectedArchive->branchOffice?->dwhMapping?->is_active)
+                        @if (! $canValidateAgainstTarget)
                             <div class="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
-                                Cabang arsip ini belum punya mapping target aktif. Lookup kandidat tetap bisa dijalankan, tetapi tidak akan dibatasi ke satu kode target tertentu.
+                                Cabang arsip ini belum punya mapping target aktif. Lookup kandidat dan simpan referensi diblok sampai mapping cabang diaktifkan.
                             </div>
                         @endif
 
@@ -219,10 +222,10 @@
                         </div>
 
                         <div class="flex flex-wrap justify-end gap-3">
-                            <x-filament::button type="button" color="gray" wire:click="lookupCandidates" wire:loading.attr="disabled">
+                            <x-filament::button type="button" color="gray" wire:click="lookupCandidates" wire:loading.attr="disabled" :disabled="! $canValidateAgainstTarget">
                                 Cari Kandidat
                             </x-filament::button>
-                            <x-filament::button type="button" color="primary" wire:click="saveReferences" wire:loading.attr="disabled">
+                            <x-filament::button type="button" color="primary" wire:click="saveReferences" wire:loading.attr="disabled" :disabled="! $canValidateAgainstTarget">
                                 Simpan Referensi
                             </x-filament::button>
                         </div>
@@ -261,7 +264,7 @@
                                                     <div class="flex flex-wrap gap-2">
                                                         <x-filament::badge color="success">{{ $candidate['business_key'] }}</x-filament::badge>
                                                         <x-filament::badge color="gray">CIF {{ $candidate['cif'] ?: '-' }}</x-filament::badge>
-                                                        <x-filament::badge color="primary">Kode Target {{ $candidate['dwh_location_code'] ?: '-' }}</x-filament::badge>
+                                                        <x-filament::badge color="primary">{{ $candidate['dwh_location_code'] ?: '-' }}</x-filament::badge>
                                                         <x-filament::badge color="gray">{{ $candidate['status'] ?: 'Tanpa status' }}</x-filament::badge>
                                                     </div>
                                                     <div class="text-sm text-gray-600 dark:text-gray-300">

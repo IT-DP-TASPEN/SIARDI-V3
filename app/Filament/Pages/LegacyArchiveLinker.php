@@ -10,6 +10,7 @@ use App\Services\ArchiveVisibilityService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\ValidationException;
 
 class LegacyArchiveLinker extends Page
 {
@@ -56,12 +57,12 @@ class LegacyArchiveLinker extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return (bool) config('siardi.features.legacy_reference_linking');
+        return static::hasLegacyLinkingAccess(auth()->user());
     }
 
     public static function canAccess(): bool
     {
-        return (bool) config('siardi.features.legacy_reference_linking') && (auth()->user()?->isAdmin() ?? false);
+        return static::hasLegacyLinkingAccess(auth()->user());
     }
 
     public function selectArchive(int $archiveId): void
@@ -113,6 +114,20 @@ class LegacyArchiveLinker extends Page
         }
 
         $archive = $this->selectedArchiveQuery()->findOrFail($this->selectedArchiveId);
+
+        if (! ($archive->branchOffice?->dwhMapping?->is_active)) {
+            $this->candidateResults = [];
+            $this->hasLookedUpCandidates = false;
+
+            Notification::make()
+                ->title('Lookup kandidat diblok')
+                ->body('Cabang arsip ini belum punya mapping target aktif.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->candidateResults = app(ArchiveBusinessReferenceService::class)
             ->lookupCandidatesForArchive($archive, $this->referenceInputs)
             ->all();
@@ -144,7 +159,14 @@ class LegacyArchiveLinker extends Page
         $this->validate($this->referenceValidationRules(), [], $this->referenceValidationAttributes());
 
         $archive = $this->selectedArchiveQuery()->findOrFail($this->selectedArchiveId);
-        app(ArchiveBusinessReferenceService::class)->syncForArchive($archive, $this->referenceInputs);
+        $service = app(ArchiveBusinessReferenceService::class);
+        $validationErrors = $service->validateReferencesForArchive($archive, $this->referenceInputs);
+
+        if ($validationErrors !== []) {
+            throw ValidationException::withMessages($validationErrors);
+        }
+
+        $service->syncForArchive($archive, $this->referenceInputs);
 
         Notification::make()
             ->title('Referensi berhasil disimpan')
@@ -283,5 +305,14 @@ class LegacyArchiveLinker extends Page
             Archive::query()->with(['category', 'branchOffice.dwhMapping']),
             auth()->user(),
         );
+    }
+
+    protected static function hasLegacyLinkingAccess(mixed $user): bool
+    {
+        if (! config('siardi.features.legacy_reference_linking') || ! $user) {
+            return false;
+        }
+
+        return app(ArchiveVisibilityService::class)->visibleSupportedCategoryIds($user) !== [];
     }
 }

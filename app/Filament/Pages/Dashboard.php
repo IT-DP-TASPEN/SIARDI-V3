@@ -64,7 +64,7 @@ class Dashboard extends BaseDashboard
                 ->color('gray')
                 ->icon('heroicon-o-link')
                 ->url(LegacyArchiveLinker::getUrl())
-                ->visible(fn(): bool => (bool) config('siardi.features.legacy_reference_linking') && (auth()->user()?->isAdmin() ?? false)),
+                ->visible(fn (): bool => LegacyArchiveLinker::canAccess()),
         ];
     }
 }

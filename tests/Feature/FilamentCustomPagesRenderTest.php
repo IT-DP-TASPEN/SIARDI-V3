@@ -96,6 +96,11 @@ class FilamentCustomPagesRenderTest extends TestCase
     public function test_legacy_linking_page_renders_with_empty_state(): void
     {
         $user = $this->createAdminUser();
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+        $user->permittedCategories()->attach($category->id);
 
         $this->actingAs($user)
             ->get('/arsip_digital/legacy-archive-linker')

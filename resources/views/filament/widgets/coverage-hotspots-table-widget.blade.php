@@ -42,7 +42,7 @@
                                 <td><x-filament::badge color="gray">{{ $row['category_name'] }}</x-filament::badge></td>
                                 <td>
                                     <div class="font-medium text-gray-950 dark:text-white">{{ $row['branch_name'] }}</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['branch_code'] }} | Kode Target {{ $row['dwh_location_code'] }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['dwh_location_code'] }}</div>
                                 </td>
                                 <td class="text-right">{{ number_format($row['target_count']) }}</td>
                                 <td class="text-right">{{ number_format($row['realized_count']) }}</td>
