@@ -9,5 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('siardi:rematch-references')
-    ->dailyAt('01:15')
+    ->dailyAt('06:00')
     ->withoutOverlapping();
