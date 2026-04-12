@@ -15,7 +15,7 @@ Audit date: 2026-04-11
   - `raw_savings`: business key `norekening`, CIF `nocif`, branch `locationid`
   - `raw_loans`: business key `id`, CIF `nocif`, branch `locationid`
   - `raw_time_deposits`: business key `nobilyet`, CIF `nocif`, branch `locationid`
-- Snapshot dates are not perfectly aligned across DWH tables. On 2026-04-11, `raw_cif` had data through `2026-04-11`, while `raw_savings`, `raw_loans`, and `raw_time_deposits` were at `2026-04-10`.
+- The DWH mirror tables expose an `as_of_date` column, but the application now treats `raw_savings`, `raw_loans`, and `raw_time_deposits` as current-state daily upsert sources rather than user-selectable snapshot-history sources.
 
 ## Extension Design
 
@@ -104,5 +104,5 @@ Audit date: 2026-04-11
 ## Known Limitations
 
 - Initial reconciliation scope is limited to `TABUNGAN`, `KREDIT`, and `BILYET DEPOSITO`.
-- Realized coverage is current distinct linkage, compared against the selected DWH snapshot. It is not a historical snapshot of what SIARDI looked like on that date.
+- Realized coverage is current distinct linkage against the current mirrored DWH state. If historical snapshot behavior is required, it must be handled in the ETL layer instead of inferred inside the application.
 - Legacy suggestion parsing is heuristic and intentionally non-persistent until a user saves the linkage.

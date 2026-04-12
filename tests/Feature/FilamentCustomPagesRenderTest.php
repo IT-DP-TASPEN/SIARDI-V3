@@ -98,7 +98,9 @@ class FilamentCustomPagesRenderTest extends TestCase
             ->get('/arsip_digital/legacy-archive-linker')
             ->assertOk()
             ->assertSee('Filter Arsip Legacy')
-            ->assertSee('Tidak ada arsip legacy yang cocok.');
+            ->assertSee('Tidak ada arsip legacy yang cocok.')
+            ->assertSee('legacy-linking-modal', false)
+            ->assertDontSee('legacy-linking-workspace', false);
     }
 
     private function createAdminUser(): User

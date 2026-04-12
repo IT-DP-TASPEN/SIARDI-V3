@@ -16,7 +16,7 @@ class CoverageHotspotsTableWidget extends Widget
 
     public static function canView(): bool
     {
-        return false && (bool) config('siardi.features.dwh_reconciliation');
+        return (bool) config('siardi.features.dwh_reconciliation');
     }
 
     /**

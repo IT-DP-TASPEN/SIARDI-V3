@@ -26,9 +26,10 @@ class DwhCoverageRepositoryTest extends TestCase
 
         $this->setUpDwhConnection();
         $this->createRawSavingsTable();
+        $this->createRawTimeDepositsTable();
     }
 
-    public function test_reconciliation_counts_distinct_covered_records_and_excludes_closed_or_internal_rows(): void
+    public function test_reconciliation_counts_distinct_covered_records_and_includes_all_current_state_rows(): void
     {
         $category = Category::query()->create([
             'category_name' => 'TABUNGAN',
@@ -113,11 +114,85 @@ class DwhCoverageRepositoryTest extends TestCase
         $summary = $repository->getCoverageSummary(branchOfficeId: $branch->id, categoryId: $category->id)->first();
         $missing = $repository->getMissingRecords($category->id, $branch->id);
 
+        $this->assertSame(3, $summary['target_count']);
+        $this->assertSame(1, $summary['realized_count']);
+        $this->assertSame(2, $summary['missing_count']);
+        $this->assertSame('001000000000002', $missing->first()['business_key']);
+        $this->assertCount(2, $missing);
+        $this->assertSame(
+            ['001000000000002', '001000000000003'],
+            $missing->pluck('business_key')->values()->all(),
+        );
+    }
+
+    public function test_deposito_target_includes_rows_marked_sudah_dicairkan(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'BILYET DEPOSITO',
+            'category_description' => 'Deposito',
+        ]);
+
+        $primaryField = CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'deposito_bilyet_no',
+            'label' => 'Nomor Bilyet Deposito',
+            'input_type' => 'text',
+            'sort_order' => 20,
+            'is_required' => true,
+            'is_primary_match_key' => true,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'time_deposits',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'Kantor Pusat Operasional',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+
+        DwhBranchMapping::query()->create([
+            'branch_office_id' => $branch->id,
+            'siardi_branch_code' => '01',
+            'dwh_location_code' => '001',
+            'dwh_location_name' => 'Kantor Pusat Operasional',
+            'is_active' => true,
+        ]);
+
+        DB::connection('dwh')->table('raw_time_deposits')->insert([
+            ['_row_key' => 'DEP-1', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000001', 'nobilyet' => 'BILYET-001', 'status_dokumen' => 'Sudah Dicairkan'],
+            ['_row_key' => 'DEP-2', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000002', 'nobilyet' => 'BILYET-002', 'status_dokumen' => 'Active'],
+        ]);
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Deposito Archive',
+            'archive_description' => 'Archive',
+            'archive_path' => 'archives/deposito.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-10',
+        ]);
+
+        ArchiveBusinessReference::query()->create([
+            'archive_id' => $archive->id,
+            'category_reference_field_id' => $primaryField->id,
+            'reference_type' => 'deposito_bilyet_no',
+            'raw_value' => 'BILYET-001',
+            'normalized_value' => 'BILYET-001',
+        ]);
+
+        $summary = app(DwhCoverageRepository::class)->getCoverageSummary(
+            branchOfficeId: $branch->id,
+            categoryId: $category->id,
+        )->first();
+
         $this->assertSame(2, $summary['target_count']);
         $this->assertSame(1, $summary['realized_count']);
         $this->assertSame(1, $summary['missing_count']);
-        $this->assertSame('001000000000002', $missing->first()['business_key']);
-        $this->assertCount(1, $missing);
     }
 
     public function test_search_reference_candidates_returns_exact_matches_with_reference_payload(): void

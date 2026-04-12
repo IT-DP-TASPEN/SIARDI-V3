@@ -110,7 +110,6 @@ class DashboardSnapshotService
                 'realized_total' => 0,
                 'missing_total' => 0,
                 'coverage_percentage' => 0.0,
-                'snapshot_label' => '-',
             ];
         }
 
@@ -125,15 +124,12 @@ class DashboardSnapshotService
                 'realized_total' => 0,
                 'missing_total' => 0,
                 'coverage_percentage' => 0.0,
-                'snapshot_label' => '-',
             ];
         }
 
         $targetTotal = (int) $summary->sum('target_count');
         $realizedTotal = (int) $summary->sum('realized_count');
         $missingTotal = (int) $summary->sum('missing_count');
-        $snapshotDates = $summary->pluck('as_of_date')->filter()->unique()->values();
-        $maxSnapshotDate = $snapshotDates->sort()->last();
 
         return [
             'enabled' => true,
@@ -143,9 +139,6 @@ class DashboardSnapshotService
             'realized_total' => $realizedTotal,
             'missing_total' => $missingTotal,
             'coverage_percentage' => $targetTotal > 0 ? round(($realizedTotal / $targetTotal) * 100, 2) : 0.0,
-            'snapshot_label' => $snapshotDates->count() > 1
-                ? 'Mixed, latest '.$maxSnapshotDate
-                : ($snapshotDates->first() ?? '-'),
         ];
     }
 

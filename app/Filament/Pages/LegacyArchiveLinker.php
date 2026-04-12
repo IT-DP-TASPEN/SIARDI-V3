@@ -11,6 +11,8 @@ use Filament\Pages\Page;
 
 class LegacyArchiveLinker extends Page
 {
+    public const LINKING_MODAL_ID = 'legacy-linking-modal';
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-link';
 
     protected string $view = 'filament.pages.legacy-archive-linker';
@@ -75,10 +77,25 @@ class LegacyArchiveLinker extends Page
         }
 
         $this->selectedArchiveId = $archiveId;
-        $this->dispatch('legacy-linking-archive-selected');
+        $this->dispatch('open-modal', id: self::LINKING_MODAL_ID);
     }
 
     public function clearSelection(): void
+    {
+        $this->resetSelectionState();
+        $this->dispatch('close-modal', id: self::LINKING_MODAL_ID);
+    }
+
+    public function handleModalClosed(string $id): void
+    {
+        if ($id !== self::LINKING_MODAL_ID) {
+            return;
+        }
+
+        $this->resetSelectionState();
+    }
+
+    protected function resetSelectionState(): void
     {
         $this->selectedArchiveId = null;
         $this->referenceInputs = [];
@@ -132,11 +149,8 @@ class LegacyArchiveLinker extends Page
             ->success()
             ->send();
 
-        $this->selectedArchiveId = null;
-        $this->referenceInputs = [];
-        $this->suggestions = [];
-        $this->candidateResults = [];
-        $this->hasLookedUpCandidates = false;
+        $this->resetSelectionState();
+        $this->dispatch('close-modal', id: self::LINKING_MODAL_ID);
     }
 
     protected function getViewData(): array

@@ -23,7 +23,6 @@
                         <tr>
                             <th>Kategori</th>
                             <th>Cabang</th>
-                            <th>As Of</th>
                             <th class="text-right">Target</th>
                             <th class="text-right">Realized</th>
                             <th class="text-right">Missing</th>
@@ -45,7 +44,6 @@
                                     <div class="font-medium text-gray-950 dark:text-white">{{ $row['branch_name'] }}</div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['branch_code'] }} | DWH {{ $row['dwh_location_code'] }}</div>
                                 </td>
-                                <td>{{ $row['as_of_date'] }}</td>
                                 <td class="text-right">{{ number_format($row['target_count']) }}</td>
                                 <td class="text-right">{{ number_format($row['realized_count']) }}</td>
                                 <td class="text-right">

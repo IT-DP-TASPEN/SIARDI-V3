@@ -6,6 +6,7 @@ use App\Filament\Widgets\ArchiveOperationsStatsWidget;
 use App\Filament\Widgets\ArchiveUploadsTrendWidget;
 use App\Filament\Widgets\CoverageHotspotsTableWidget;
 use App\Filament\Widgets\DwhCoverageStatsWidget;
+use App\Filament\Widgets\RecentArchivesTableWidget;
 use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
 
@@ -28,6 +29,7 @@ class Dashboard extends BaseDashboard
             ArchiveOperationsStatsWidget::class,
             DwhCoverageStatsWidget::class,
             ArchiveUploadsTrendWidget::class,
+            RecentArchivesTableWidget::class,
             CoverageHotspotsTableWidget::class,
         ];
     }

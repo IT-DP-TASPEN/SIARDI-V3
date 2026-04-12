@@ -23,13 +23,9 @@ class DwhCoverageDashboard extends Page
 
     public ?int $selectedBranchOfficeId = null;
 
-    public ?string $selectedAsOfDate = null;
-
     public ?int $drilldownCategoryId = null;
 
     public ?int $drilldownBranchOfficeId = null;
-
-    public ?string $drilldownAsOfDate = null;
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -41,18 +37,16 @@ class DwhCoverageDashboard extends Page
         return (bool) config('siardi.features.dwh_reconciliation');
     }
 
-    public function openDrilldown(int $categoryId, int $branchOfficeId, string $asOfDate): void
+    public function openDrilldown(int $categoryId, int $branchOfficeId): void
     {
         $this->drilldownCategoryId = $categoryId;
         $this->drilldownBranchOfficeId = $branchOfficeId;
-        $this->drilldownAsOfDate = $asOfDate;
     }
 
     public function clearDrilldown(): void
     {
         $this->drilldownCategoryId = null;
         $this->drilldownBranchOfficeId = null;
-        $this->drilldownAsOfDate = null;
     }
 
     protected function getViewData(): array
@@ -72,13 +66,9 @@ class DwhCoverageDashboard extends Page
             'summaryRows' => $repository->getCoverageSummary(
                 branchOfficeId: $this->selectedBranchOfficeId,
                 categoryId: $this->selectedCategoryId,
-                asOfDate: $this->selectedAsOfDate,
             ),
             'missingRows' => $this->drilldownCategoryId && $this->drilldownBranchOfficeId
-                ? $repository->getMissingRecords($this->drilldownCategoryId, $this->drilldownBranchOfficeId, $this->drilldownAsOfDate)
-                : collect(),
-            'availableSnapshotDates' => $this->selectedCategoryId
-                ? $repository->getAvailableSnapshotDatesForCategory($this->selectedCategoryId)
+                ? $repository->getMissingRecords($this->drilldownCategoryId, $this->drilldownBranchOfficeId)
                 : collect(),
         ];
     }

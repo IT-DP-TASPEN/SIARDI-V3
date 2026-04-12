@@ -48,6 +48,38 @@
         @apply text-xs text-gray-500 dark:text-gray-400;
     }
 
+    .siardi-workspace-stack {
+        @apply mt-6 space-y-4;
+    }
+
+    .siardi-surface-card {
+        @apply rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm ring-1 ring-gray-950/5 dark:border-white/10 dark:bg-white/5 dark:ring-white/10;
+    }
+
+    .siardi-candidate-card {
+        @apply rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm ring-1 ring-gray-950/5 dark:border-white/10 dark:bg-gray-900/70 dark:ring-white/10;
+    }
+
+    .siardi-panel-split {
+        @apply flex flex-col gap-4 sm:flex-row sm:items-start;
+    }
+
+    .siardi-panel-copy {
+        @apply min-w-0 flex-1 space-y-3;
+    }
+
+    .siardi-action-rail {
+        @apply flex w-full justify-end sm:ml-auto sm:w-auto sm:shrink-0 sm:self-start;
+    }
+
+    .siardi-chip-list {
+        @apply flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400;
+    }
+
+    .siardi-chip {
+        @apply rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-gray-600 dark:border-white/10 dark:bg-white/10 dark:text-gray-300;
+    }
+
     .siardi-table-shell {
         @apply overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-white/10 dark:bg-gray-900 dark:ring-white/10;
     }

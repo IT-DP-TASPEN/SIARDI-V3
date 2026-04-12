@@ -8,17 +8,17 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class DwhCoverageStatsWidget extends StatsOverviewWidget
 {
-    protected static bool $isLazy = true;
+    protected static bool $isLazy = false;
 
     protected int | string | array $columnSpan = 'full';
 
     protected ?string $heading = 'Ringkasan Coverage DWH';
 
-    protected ?string $description = 'Target, realized, dan missing berdasarkan distinct business record.';
+    protected ?string $description = 'Target, realized, dan missing berdasarkan distinct business record pada mirror DWH harian.';
 
     public static function canView(): bool
     {
-        return false && (bool) config('siardi.features.dwh_reconciliation');
+        return (bool) config('siardi.features.dwh_reconciliation');
     }
 
     /**
@@ -39,7 +39,7 @@ class DwhCoverageStatsWidget extends StatsOverviewWidget
 
         return [
             Stat::make('Target', number_format($overview['target_total']))
-                ->description('Latest snapshot: ' . $overview['snapshot_label'])
+                ->description('Data mirror DWH harian.')
                 ->color('primary')
                 ->icon('heroicon-o-circle-stack'),
             Stat::make('Realized', number_format($overview['realized_total']))

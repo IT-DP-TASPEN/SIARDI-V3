@@ -108,6 +108,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->test(LegacyArchiveLinker::class)
             ->call('selectArchive', $archive->id)
             ->assertSet('selectedArchiveId', $archive->id)
+            ->assertDispatched('open-modal', id: LegacyArchiveLinker::LINKING_MODAL_ID)
             ->assertSee('Legacy Savings Archive')
             ->set("referenceInputs.{$primaryField->id}", '001000000000001')
             ->call('lookupCandidates')
@@ -115,6 +116,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->call('applyCandidate', 0)
             ->assertSet("referenceInputs.{$cifField->id}", '00100013785')
             ->call('saveReferences')
+            ->assertDispatched('close-modal', id: LegacyArchiveLinker::LINKING_MODAL_ID)
             ->assertSet('selectedArchiveId', null);
 
         $this->assertDatabaseHas('archive_business_references', [

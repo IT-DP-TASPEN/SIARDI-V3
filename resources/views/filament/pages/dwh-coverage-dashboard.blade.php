@@ -10,7 +10,7 @@
     <div class="siardi-page-stack">
         <x-filament::section
             heading="Filter Rekonsiliasi"
-            description="Gunakan filter kategori, cabang, dan snapshot untuk memeriksa coverage arsip terhadap data target DWH."
+            description="Gunakan filter kategori dan cabang untuk memeriksa coverage arsip terhadap data mirror DWH yang diperbarui harian."
             icon="heroicon-o-funnel"
         >
             <x-slot name="afterHeader">
@@ -45,34 +45,12 @@
                         </select>
                     </x-filament::input.wrapper>
                 </label>
-
-                <label class="siardi-filter-field">
-                    <span class="siardi-filter-label">As Of Date</span>
-                    <x-filament::input.wrapper x-on:focus-input.stop="$el.querySelector('input')?.focus()">
-                        <input type="date" wire:model.live="selectedAsOfDate" class="fi-input">
-                    </x-filament::input.wrapper>
-                </label>
-
-                <div class="siardi-filter-field">
-                    <span class="siardi-filter-label">Snapshot Tersedia</span>
-                    @if ($selectedCategoryId && $availableSnapshotDates->isNotEmpty())
-                        <div class="flex flex-wrap gap-2">
-                            @foreach ($availableSnapshotDates as $snapshotDate)
-                                <x-filament::badge color="{{ $selectedAsOfDate === $snapshotDate ? 'primary' : 'gray' }}">
-                                    {{ $snapshotDate }}
-                                </x-filament::badge>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="siardi-filter-help">Pilih kategori untuk melihat daftar snapshot yang tersedia.</p>
-                    @endif
-                </div>
             </div>
         </x-filament::section>
 
         <x-filament::section
             heading="Ringkasan Coverage"
-            description="Target dihitung dari data DWH per cabang dan kategori, realized dihitung dari distinct business record yang sudah tertaut di SIARDI."
+            description="Target dihitung dari seluruh distinct business record yang ada di mirror DWH per cabang dan kategori, realized dihitung dari distinct business record yang sudah tertaut di SIARDI."
             icon="heroicon-o-chart-bar-square"
         >
             <div class="siardi-stat-grid">
@@ -110,7 +88,6 @@
                         <tr>
                             <th>Kategori</th>
                             <th>Cabang</th>
-                            <th>As Of</th>
                             <th class="text-right">Target</th>
                             <th class="text-right">Realized</th>
                             <th class="text-right">Missing</th>
@@ -137,7 +114,6 @@
                                         <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['dwh_location_code'] }}</div>
                                     </div>
                                 </td>
-                                <td>{{ $row['as_of_date'] }}</td>
                                 <td class="text-right">{{ number_format($row['target_count']) }}</td>
                                 <td class="text-right">{{ number_format($row['realized_count']) }}</td>
                                 <td class="text-right">
@@ -156,7 +132,7 @@
                                         color="gray"
                                         outlined
                                         size="sm"
-                                        wire:click="openDrilldown({{ $row['category_id'] }}, {{ $row['branch_office_id'] }}, '{{ $row['as_of_date'] }}')"
+                                        wire:click="openDrilldown({{ $row['category_id'] }}, {{ $row['branch_office_id'] }})"
                                     >
                                         Missing Detail
                                     </x-filament::button>
@@ -164,7 +140,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8">
+                                <td colspan="7">
                                     <div class="siardi-empty">Belum ada data rekonsiliasi.</div>
                                 </td>
                             </tr>
@@ -190,7 +166,6 @@
                                     <th>CIF</th>
                                     <th>Business Key</th>
                                     <th>Status</th>
-                                    <th>As Of</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -203,7 +178,6 @@
                                         <td>
                                             <x-filament::badge color="gray">{{ $row['status'] ?: 'Unknown' }}</x-filament::badge>
                                         </td>
-                                        <td>{{ $row['as_of_date'] }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

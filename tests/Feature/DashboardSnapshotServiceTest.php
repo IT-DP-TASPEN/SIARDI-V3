@@ -219,7 +219,6 @@ class DashboardSnapshotServiceTest extends TestCase
         $this->assertSame(1, $overview['realized_total']);
         $this->assertSame(4, $overview['missing_total']);
         $this->assertSame(20.0, $overview['coverage_percentage']);
-        $this->assertSame('2026-04-10', $overview['snapshot_label']);
         $this->assertSame('02', $hotspots->first()['branch_code']);
         $this->assertSame(3, $hotspots->first()['missing_count']);
     }

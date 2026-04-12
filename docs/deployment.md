@@ -107,4 +107,4 @@ This rollback avoids destructive schema churn and preserves any manually linked 
 
 - Reconciliation coverage is only enabled for `TABUNGAN`, `KREDIT`, and `BILYET DEPOSITO`.
 - Branch mappings for `00` and `09` are seeded as inactive by default.
-- Dashboard accuracy depends on DWH snapshot freshness and the selected `as_of_date`.
+- The application treats mirrored DWH tables as current-state daily upsert sources and does not apply snapshot-date filtering in the app layer.
