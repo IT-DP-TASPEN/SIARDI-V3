@@ -49,6 +49,11 @@ class LegacyArchiveLinker extends Page
     public array $suggestions = [];
 
     /**
+     * @var array<string, mixed>
+     */
+    public array $candidateSearchInputs = [];
+
+    /**
      * @var array<int, array<string, mixed>>
      */
     public array $candidateResults = [];
@@ -72,6 +77,9 @@ class LegacyArchiveLinker extends Page
         $fields = $service->getFieldDefinitionsForCategory($archive->archive_category);
         $this->suggestions = $service->getLegacySuggestions($archive);
         $this->referenceInputs = [];
+        $this->candidateSearchInputs = [
+            'loan_alt_account_no' => $this->suggestions['loan_alt_account_no'] ?? '',
+        ];
         $this->candidateResults = [];
         $this->hasLookedUpCandidates = false;
 
@@ -103,6 +111,7 @@ class LegacyArchiveLinker extends Page
         $this->selectedArchiveId = null;
         $this->referenceInputs = [];
         $this->suggestions = [];
+        $this->candidateSearchInputs = [];
         $this->candidateResults = [];
         $this->hasLookedUpCandidates = false;
     }
@@ -129,7 +138,7 @@ class LegacyArchiveLinker extends Page
         }
 
         $this->candidateResults = app(ArchiveBusinessReferenceService::class)
-            ->lookupCandidatesForArchive($archive, $this->referenceInputs)
+            ->lookupCandidatesForArchive($archive, $this->referenceInputs, $this->candidateSearchInputs)
             ->all();
         $this->hasLookedUpCandidates = true;
     }
@@ -146,6 +155,10 @@ class LegacyArchiveLinker extends Page
 
         foreach ($fields as $field) {
             $this->referenceInputs[$field->id] = $candidate['reference_values'][$field->reference_type] ?? '';
+        }
+
+        if (isset($candidate['reference_values']['loan_alt_account_no'])) {
+            $this->candidateSearchInputs['loan_alt_account_no'] = $candidate['reference_values']['loan_alt_account_no'];
         }
 
         Notification::make()
@@ -193,7 +206,9 @@ class LegacyArchiveLinker extends Page
 
         return [
             'archives' => $this->scopedArchivesQuery()
-                ->doesntHave('businessReferences')
+                ->whereDoesntHave('businessReferences', function (Builder $query): void {
+                    $query->whereNotIn('reference_type', app(ArchiveBusinessReferenceService::class)->deprecatedReferenceTypes());
+                })
                 ->when($this->categoryId, fn ($query) => $query->where('archive_category', $this->categoryId))
                 ->when($this->branchOfficeId, fn ($query) => $query->where('archive_branch_office', $this->branchOfficeId))
                 ->when($this->uploadedFrom, fn ($query) => $query->whereDate('created_at', '>=', $this->uploadedFrom))
@@ -278,14 +293,14 @@ class LegacyArchiveLinker extends Page
     {
         $supportedCategoryNames = array_keys(config('siardi.supported_reconciliation_categories', []));
         $visibleSupportedCategoryIds = app(ArchiveVisibilityService::class)->visibleSupportedCategoryIds(auth()->user());
+        $referenceService = app(ArchiveBusinessReferenceService::class);
 
         return Category::query()
             ->whereIn('id', $visibleSupportedCategoryIds)
             ->whereIn('category_name', $supportedCategoryNames)
-            ->withCount('referenceFields')
             ->orderBy('category_name')
             ->get()
-            ->filter(fn (Category $category): bool => $category->reference_fields_count === 0)
+            ->filter(fn (Category $category): bool => $referenceService->getFieldDefinitionsForCategory($category->id)->isEmpty())
             ->pluck('category_name')
             ->values()
             ->all();

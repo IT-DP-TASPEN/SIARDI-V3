@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Archive;
+use App\Models\ArchiveBusinessReference;
 use App\Models\BranchOffice;
 use App\Models\Category;
+use App\Models\CategoryReferenceField;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -79,6 +81,53 @@ class LegacyArchiveCompatibilityTest extends TestCase
             ->get("/arsip_digital/archives/{$archive->id}/edit")
             ->assertOk()
             ->assertSee('Editable Archive');
+    }
+
+    public function test_kredit_view_hides_deprecated_loan_contract_reference(): void
+    {
+        [$branch, $category, $user] = $this->createArchiveUserContext();
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Hidden Contract Archive',
+            'archive_code' => 'HIDE-001',
+            'archive_description' => 'Archive with deprecated reference',
+            'archive_path' => 'archives/hide-contract.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-10',
+        ]);
+
+        $field = CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'loan_contract_no',
+            'label' => 'Nomor Perjanjian Kredit',
+            'input_type' => 'text',
+            'sort_order' => 30,
+            'is_required' => false,
+            'is_primary_match_key' => false,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'loans',
+        ]);
+
+        ArchiveBusinessReference::query()->create([
+            'archive_id' => $archive->id,
+            'category_reference_field_id' => $field->id,
+            'reference_type' => 'loan_contract_no',
+            'raw_value' => 'PK-LEGACY-001',
+            'normalized_value' => 'PK-LEGACY-001',
+            'source_system' => 'siardi',
+            'source_table' => 'archives',
+            'source_key_name' => 'loan_contract_no',
+            'branch_code' => $branch->branch_code,
+        ]);
+
+        $this->actingAs($user)
+            ->get("/arsip_digital/archives/{$archive->id}")
+            ->assertOk()
+            ->assertDontSee('Nomor Perjanjian Kredit')
+            ->assertDontSee('PK-LEGACY-001');
     }
 
     /**

@@ -9,10 +9,18 @@ use App\Models\CategoryReferenceField;
 use App\Repositories\DwhCoverageRepository;
 use App\Support\LegacyReferenceSuggestionParser;
 use App\Support\ReferenceNormalizer;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class ArchiveBusinessReferenceService
 {
+    /**
+     * @var array<int, string>
+     */
+    private const DEPRECATED_REFERENCE_TYPES = [
+        'loan_contract_no',
+    ];
+
     public function __construct(
         private readonly DwhCoverageRepository $dwhCoverageRepository,
         private readonly LegacyReferenceSuggestionParser $legacyReferenceSuggestionParser,
@@ -29,6 +37,7 @@ class ArchiveBusinessReferenceService
 
         return CategoryReferenceField::query()
             ->where('category_id', $categoryId)
+            ->whereNotIn('reference_type', self::DEPRECATED_REFERENCE_TYPES)
             ->orderBy('sort_order')
             ->get();
     }
@@ -38,9 +47,38 @@ class ArchiveBusinessReferenceService
      */
     public function getFormStateForArchive(Archive $archive): array
     {
+        $activeFieldIds = $this->getFieldDefinitionsForCategory($archive->archive_category)
+            ->pluck('id')
+            ->all();
+
+        if ($activeFieldIds === []) {
+            return [];
+        }
+
         return $archive->businessReferences()
+            ->whereIn('category_reference_field_id', $activeFieldIds)
             ->pluck('raw_value', 'category_reference_field_id')
             ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function deprecatedReferenceTypes(): array
+    {
+        return self::DEPRECATED_REFERENCE_TYPES;
+    }
+
+    /**
+     * @return Collection<int, ArchiveBusinessReference>
+     */
+    public function visibleBusinessReferences(Archive $archive): Collection
+    {
+        $archive->loadMissing('businessReferences.categoryReferenceField');
+
+        return $archive->businessReferences
+            ->filter(fn (ArchiveBusinessReference $reference): bool => ! in_array($reference->reference_type, self::DEPRECATED_REFERENCE_TYPES, true))
+            ->values();
     }
 
     /**
@@ -89,6 +127,110 @@ class ArchiveBusinessReferenceService
                 ],
             );
         }
+    }
+
+    /**
+     * @return array{archive_id: int|string, updated_references: int, matched_references: int, unmatched_references: int}
+     */
+    public function rematchArchive(Archive $archive): array
+    {
+        $archive->loadMissing([
+            'branchOffice.dwhMapping',
+            'businessReferences.categoryReferenceField.category',
+        ]);
+
+        $updatedReferences = 0;
+        $matchedReferences = 0;
+        $unmatchedReferences = 0;
+        $dwhLocationCode = $archive->branchOffice?->dwhMapping?->dwh_location_code;
+
+        foreach ($archive->businessReferences as $reference) {
+            $field = $reference->categoryReferenceField;
+
+            if (! $field || blank($reference->normalized_value)) {
+                continue;
+            }
+
+            $match = $this->dwhCoverageRepository->matchReference(
+                $field,
+                (string) $reference->normalized_value,
+                $dwhLocationCode,
+            );
+
+            $matchedTable = $match['matched_table'] ?? null;
+            $matchedSourceKey = $match['matched_source_key'] ?? null;
+
+            if ($reference->matched_table !== $matchedTable || $reference->matched_source_key !== $matchedSourceKey) {
+                $reference->forceFill([
+                    'matched_table' => $matchedTable,
+                    'matched_source_key' => $matchedSourceKey,
+                ])->save();
+
+                $updatedReferences++;
+            }
+
+            if (filled($matchedSourceKey)) {
+                $matchedReferences++;
+            } else {
+                $unmatchedReferences++;
+            }
+        }
+
+        return [
+            'archive_id' => $archive->getKey(),
+            'updated_references' => $updatedReferences,
+            'matched_references' => $matchedReferences,
+            'unmatched_references' => $unmatchedReferences,
+        ];
+    }
+
+    /**
+     * @param  iterable<int, int|string>  $archiveIds
+     * @return array{processed_archives: int, updated_references: int}
+     */
+    public function rematchArchives(iterable $archiveIds): array
+    {
+        $processedArchives = 0;
+        $updatedReferences = 0;
+
+        Archive::query()
+            ->with([
+                'branchOffice.dwhMapping',
+                'businessReferences.categoryReferenceField.category',
+            ])
+            ->whereKey(collect($archiveIds)->filter()->values()->all())
+            ->each(function (Archive $archive) use (&$processedArchives, &$updatedReferences): void {
+                $result = $this->rematchArchive($archive);
+                $processedArchives++;
+                $updatedReferences += $result['updated_references'];
+            });
+
+        return [
+            'processed_archives' => $processedArchives,
+            'updated_references' => $updatedReferences,
+        ];
+    }
+
+    public function rematchableArchivesQuery(bool $force = false): Builder
+    {
+        $supportedCategoryIds = Category::query()
+            ->whereIn('category_name', array_keys(config('siardi.supported_reconciliation_categories', [])))
+            ->pluck('id')
+            ->all();
+
+        return Archive::query()
+            ->select('archives.id')
+            ->distinct()
+            ->whereIn('archives.archive_category', $supportedCategoryIds)
+            ->whereHas('businessReferences', function (Builder $query) use ($force): void {
+                $query->whereHas('categoryReferenceField', function (Builder $fieldQuery): void {
+                    $fieldQuery->where('is_primary_match_key', true);
+                });
+
+                if (! $force) {
+                    $query->whereNull('matched_source_key');
+                }
+            });
     }
 
     /**
@@ -192,9 +334,10 @@ class ArchiveBusinessReferenceService
 
     /**
      * @param  array<int|string, mixed>  $submittedReferences
+     * @param  array<string, mixed>  $searchHelperInputs
      * @return Collection<int, array<string, mixed>>
      */
-    public function lookupCandidatesForArchive(Archive $archive, array $submittedReferences): Collection
+    public function lookupCandidatesForArchive(Archive $archive, array $submittedReferences, array $searchHelperInputs = []): Collection
     {
         $archive->loadMissing(['category', 'branchOffice.dwhMapping']);
 
@@ -208,6 +351,7 @@ class ArchiveBusinessReferenceService
                 return [$field->reference_type => $value];
             })
             ->filter(fn (?string $value): bool => filled($value))
+            ->merge($this->normalizeSearchHelperInputs($searchHelperInputs))
             ->all();
 
         if ($filters === [] || ! ($archive->category instanceof Category)) {
@@ -231,6 +375,7 @@ class ArchiveBusinessReferenceService
     public function getLinkageStatus(Archive $archive): array
     {
         $archive->loadMissing(['category', 'businessReferences.categoryReferenceField']);
+        $visibleReferences = $this->visibleBusinessReferences($archive);
 
         if (! config('siardi.features.business_references')) {
             return [
@@ -262,7 +407,7 @@ class ArchiveBusinessReferenceService
             ];
         }
 
-        if ($archive->businessReferences->isEmpty()) {
+        if ($visibleReferences->isEmpty()) {
             return [
                 'label' => 'Belum Ditautkan',
                 'color' => 'danger',
@@ -272,7 +417,7 @@ class ArchiveBusinessReferenceService
         }
 
         $primaryFieldId = $fields->firstWhere('is_primary_match_key', true)?->id;
-        $primaryReference = $archive->businessReferences
+        $primaryReference = $visibleReferences
             ->first(fn (ArchiveBusinessReference $reference): bool => $reference->category_reference_field_id === $primaryFieldId);
 
         if (! $primaryReference) {
@@ -307,5 +452,29 @@ class ArchiveBusinessReferenceService
             $categoryName,
             config('siardi.supported_reconciliation_categories', []),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $searchHelperInputs
+     * @return array<string, string>
+     */
+    private function normalizeSearchHelperInputs(array $searchHelperInputs): array
+    {
+        return collect($searchHelperInputs)
+            ->mapWithKeys(function (mixed $value, string $key): array {
+                $value = trim((string) $value);
+
+                if ($value === '') {
+                    return [$key => ''];
+                }
+
+                if ($key === 'loan_alt_account_no') {
+                    return [$key => preg_replace('/\D+/', '', $value) ?: ''];
+                }
+
+                return [$key => ReferenceNormalizer::normalize($value)];
+            })
+            ->filter(fn (string $value): bool => filled($value))
+            ->all();
     }
 }

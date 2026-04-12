@@ -26,6 +26,7 @@ class DwhCoverageRepositoryTest extends TestCase
 
         $this->setUpDwhConnection();
         $this->createRawSavingsTable();
+        $this->createRawLoansTable();
         $this->createRawTimeDepositsTable();
     }
 
@@ -244,5 +245,64 @@ class DwhCoverageRepositoryTest extends TestCase
         $this->assertSame('ROW-1', $candidates->first()['source_key']);
         $this->assertSame('00100013785', $candidates->first()['reference_values']['cif']);
         $this->assertSame('001000000000001', $candidates->first()['reference_values']['savings_account_no']);
+    }
+
+    public function test_search_reference_candidates_can_match_kredit_alt_rekening(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'KREDIT',
+            'category_description' => 'Kredit',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'cif',
+            'label' => 'CIF',
+            'input_type' => 'text',
+            'sort_order' => 10,
+            'is_required' => true,
+            'is_primary_match_key' => false,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'loans',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'loan_account_no',
+            'label' => 'Nomor Rekening Kredit',
+            'input_type' => 'text',
+            'sort_order' => 20,
+            'is_required' => true,
+            'is_primary_match_key' => true,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'loans',
+        ]);
+
+        DB::connection('dwh')->table('raw_loans')->insert([
+            [
+                '_row_key' => 'LOAN-1',
+                'as_of_date' => '2026-04-12',
+                'locationid' => '001',
+                'nocif' => '00100077777',
+                'id' => '1234567890123456',
+                'noalt' => '1234567890',
+                'noperjanjiankredit' => 'PK20260001',
+                'status_dokumen' => 'Active',
+            ],
+        ]);
+
+        $candidates = app(DwhCoverageRepository::class)->searchReferenceCandidates(
+            $category,
+            '001',
+            [
+                'loan_alt_account_no' => '12.345.67890',
+            ],
+        );
+
+        $this->assertCount(1, $candidates);
+        $this->assertSame('LOAN-1', $candidates->first()['source_key']);
+        $this->assertSame('1234567890', $candidates->first()['reference_values']['loan_alt_account_no']);
+        $this->assertSame('1234567890123456', $candidates->first()['reference_values']['loan_account_no']);
+        $this->assertArrayNotHasKey('loan_contract_no', $candidates->first()['reference_values']);
     }
 }

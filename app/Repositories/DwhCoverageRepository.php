@@ -38,7 +38,7 @@ class DwhCoverageRepository
             'reference_columns' => [
                 'cif' => 'nocif',
                 'loan_account_no' => 'id',
-                'loan_contract_no' => 'noperjanjiankredit',
+                'loan_alt_account_no' => 'noalt',
             ],
         ],
         'BILYET DEPOSITO' => [
@@ -249,7 +249,10 @@ class DwhCoverageRepository
 
         $filters = collect($filters)
             ->filter(fn (mixed $value): bool => filled($value))
-            ->map(fn (mixed $value): string => strtoupper((string) preg_replace('/\s+/', '', trim((string) $value))))
+            ->mapWithKeys(fn (mixed $value, string $referenceType): array => [
+                $referenceType => $this->normalizeLookupValue($referenceType, $value),
+            ])
+            ->filter(fn (string $value): bool => filled($value))
             ->all();
 
         if ($filters === []) {
@@ -395,5 +398,16 @@ class DwhCoverageRepository
     private function normalizedSql(string $column): string
     {
         return "UPPER(REPLACE(TRIM({$column}), ' ', ''))";
+    }
+
+    private function normalizeLookupValue(string $referenceType, mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        if ($referenceType === 'loan_alt_account_no') {
+            return preg_replace('/\D+/', '', $value) ?: '';
+        }
+
+        return strtoupper((string) preg_replace('/\s+/', '', $value));
     }
 }

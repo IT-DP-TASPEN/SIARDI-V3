@@ -58,17 +58,6 @@ class CategoryReferenceFieldSeeder extends Seeder
                     'normalizer' => 'uppercase_compact',
                     'dwh_entity' => 'loans',
                 ],
-                [
-                    'reference_type' => 'loan_contract_no',
-                    'label' => 'Nomor Perjanjian Kredit',
-                    'help_text' => 'Opsional, untuk membantu pencarian saat linking arsip lama.',
-                    'input_type' => 'text',
-                    'sort_order' => 30,
-                    'is_required' => false,
-                    'is_primary_match_key' => false,
-                    'normalizer' => 'uppercase_compact',
-                    'dwh_entity' => 'loans',
-                ],
             ],
             'BILYET DEPOSITO' => [
                 [

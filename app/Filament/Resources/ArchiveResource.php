@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ArchiveResource\Pages;
+use App\Jobs\RematchArchiveReferencesJob;
 use App\Models\Archive;
 use App\Models\BranchOffice;
 use App\Models\Category;
@@ -10,12 +11,14 @@ use App\Services\ArchiveBusinessReferenceService;
 use App\Services\ArchiveVisibilityService;
 use App\Support\ReferenceNormalizer;
 use Carbon\Carbon;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section as FormSection;
@@ -176,15 +179,33 @@ class ArchiveResource extends Resource
                         }
 
                         $normalized = ReferenceNormalizer::normalize($value);
+                        $deprecatedReferenceTypes = app(ArchiveBusinessReferenceService::class)->deprecatedReferenceTypes();
 
-                        return $query->whereHas('businessReferences', function (Builder $referenceQuery) use ($normalized): void {
-                            $referenceQuery->where('normalized_value', $normalized);
+                        return $query->whereHas('businessReferences', function (Builder $referenceQuery) use ($deprecatedReferenceTypes, $normalized): void {
+                            $referenceQuery
+                                ->where('normalized_value', $normalized)
+                                ->whereNotIn('reference_type', $deprecatedReferenceTypes);
                         });
                     }),
             ])
             ->actions([
                 ViewAction::make(),
                 EditAction::make(),
+                Action::make('rematchReferences')
+                    ->label('Rematch Referensi')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->visible(fn (Archive $record): bool => app(ArchiveBusinessReferenceService::class)->visibleBusinessReferences($record)->isNotEmpty())
+                    ->action(function (Archive $record): void {
+                        RematchArchiveReferencesJob::dispatch($record->getKey());
+
+                        Notification::make()
+                            ->title('Job rematch dikirim')
+                            ->body('Referensi arsip akan dicocokkan ulang di background.')
+                            ->success()
+                            ->send();
+                    }),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
@@ -366,9 +387,9 @@ class ArchiveResource extends Resource
     private static function renderBusinessReferenceHtml(Archive $record): HtmlString
     {
         $status = static::archiveLinkageStatus($record);
-        $record->loadMissing('businessReferences.categoryReferenceField');
+        $references = app(ArchiveBusinessReferenceService::class)->visibleBusinessReferences($record);
 
-        if ($record->businessReferences->isEmpty()) {
+        if ($references->isEmpty()) {
             return new HtmlString(sprintf(
                 '<div class="space-y-2"><span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">%s</span><p class="text-sm text-gray-500">%s</p></div>',
                 e($status['label']),
@@ -376,7 +397,7 @@ class ArchiveResource extends Resource
             ));
         }
 
-        $items = $record->businessReferences
+        $items = $references
             ->sortBy(fn($reference) => $reference->categoryReferenceField?->sort_order ?? 999)
             ->map(function ($reference): string {
                 $label = e($reference->categoryReferenceField?->label ?? $reference->reference_type);

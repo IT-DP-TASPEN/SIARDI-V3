@@ -58,7 +58,6 @@ class DevelopmentArchiveFixtureSeeder extends Seeder
                 'references' => [
                     'cif' => '00005678',
                     'loan_account_no' => 'LN 000 9988',
-                    'loan_contract_no' => 'PK-2026-0001',
                 ],
             ],
             [

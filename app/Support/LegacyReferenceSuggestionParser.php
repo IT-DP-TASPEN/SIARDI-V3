@@ -19,12 +19,19 @@ class LegacyReferenceSuggestionParser
 
         preg_match_all('/[A-Z]{2}\d{6}|\d{6,18}/', $haystack, $matches);
         $tokens = collect($matches[0] ?? [])->unique()->values();
+        preg_match_all('/\d{2}\.?\d{3}\.?\d{5}/', $haystack, $altMatches);
+        $loanAltCandidates = collect($altMatches[0] ?? [])
+            ->map(fn (string $token): string => preg_replace('/\D+/', '', $token) ?: '')
+            ->merge($tokens->filter(fn (string $token): bool => preg_match('/^\d{10}$/', $token) === 1))
+            ->filter()
+            ->unique()
+            ->values();
 
         return [
             'cif' => (string) $tokens->first(fn (string $token): bool => preg_match('/^\d{11,12}$/', $token) === 1),
             'savings_account_no' => (string) $tokens->first(fn (string $token): bool => preg_match('/^\d{12,18}$/', $token) === 1),
             'loan_account_no' => (string) $tokens->first(fn (string $token): bool => preg_match('/^\d{16}$/', $token) === 1),
-            'loan_contract_no' => (string) $tokens->first(fn (string $token): bool => preg_match('/^\d{6,12}$/', $token) === 1),
+            'loan_alt_account_no' => (string) $loanAltCandidates->first(),
             'deposito_bilyet_no' => (string) $tokens->first(fn (string $token): bool => preg_match('/^(?:[A-Z]{2}\d{6}|\d{6})$/', $token) === 1),
         ];
     }

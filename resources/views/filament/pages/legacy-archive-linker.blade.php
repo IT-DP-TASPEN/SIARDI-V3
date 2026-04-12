@@ -219,6 +219,27 @@
                                     @endif
                                 </label>
                             @endforeach
+
+                            @if ($selectedArchive->category?->category_name === 'KREDIT')
+                                <label class="siardi-filter-field">
+                                    <span class="siardi-filter-label">
+                                        Alt Rekening Kredit
+                                        <x-filament::badge color="gray">Search Helper</x-filament::badge>
+                                    </span>
+                                    <x-filament::input.wrapper x-on:focus-input.stop="$el.querySelector('input')?.focus()">
+                                        <input type="text" wire:model.defer="candidateSearchInputs.loan_alt_account_no" class="fi-input">
+                                    </x-filament::input.wrapper>
+                                    <span class="siardi-filter-help">
+                                        Hanya untuk pencarian kandidat kredit. Nilai ini tidak disimpan sebagai referensi arsip.
+                                    </span>
+                                    @if (! empty($suggestions['loan_alt_account_no'] ?? null))
+                                        <div class="flex flex-wrap gap-2">
+                                            <x-filament::badge color="warning">Suggestion</x-filament::badge>
+                                            <x-filament::badge color="gray">{{ $suggestions['loan_alt_account_no'] }}</x-filament::badge>
+                                        </div>
+                                    @endif
+                                </label>
+                            @endif
                         </div>
 
                         <div class="flex flex-wrap justify-end gap-3">
@@ -273,8 +294,14 @@
                                                     <div class="siardi-chip-list">
                                                         @foreach ($candidate['reference_values'] as $referenceType => $value)
                                                             @if (filled($value))
+                                                                @php
+                                                                    $referenceLabel = match ($referenceType) {
+                                                                        'loan_alt_account_no' => 'Alt Rekening Kredit',
+                                                                        default => $referenceType,
+                                                                    };
+                                                                @endphp
                                                                 <span class="siardi-chip">
-                                                                    {{ $referenceType }}: {{ $value }}
+                                                                    {{ $referenceLabel }}: {{ $value }}
                                                                 </span>
                                                             @endif
                                                         @endforeach

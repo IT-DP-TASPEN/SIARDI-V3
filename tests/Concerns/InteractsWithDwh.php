@@ -41,6 +41,7 @@ trait InteractsWithDwh
             $table->string('locationid')->nullable();
             $table->string('nocif')->nullable();
             $table->string('id')->nullable();
+            $table->string('noalt')->nullable();
             $table->string('noperjanjiankredit')->nullable();
             $table->string('status_dokumen')->nullable();
         });

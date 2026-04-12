@@ -32,15 +32,15 @@ class BusinessReferenceConfigurationSeederTest extends TestCase
 
         $this->seed(\Database\Seeders\BusinessReferenceConfigurationSeeder::class);
 
-        $this->assertDatabaseCount('category_reference_fields', 7);
+        $this->assertDatabaseCount('category_reference_fields', 6);
         $this->assertDatabaseCount('dwh_branch_mappings', 2);
         $this->assertDatabaseHas('category_reference_fields', [
             'reference_type' => 'savings_account_no',
             'label' => 'Nomor Rekening Tabungan',
         ]);
         $this->assertDatabaseHas('category_reference_fields', [
-            'reference_type' => 'loan_contract_no',
-            'label' => 'Nomor Perjanjian Kredit',
+            'reference_type' => 'loan_account_no',
+            'label' => 'Nomor Rekening Kredit',
         ]);
         $this->assertDatabaseHas('category_reference_fields', [
             'reference_type' => 'deposito_bilyet_no',

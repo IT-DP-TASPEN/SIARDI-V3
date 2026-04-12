@@ -65,6 +65,56 @@ class ArchiveReferenceBehaviorTest extends TestCase
         $this->assertSame('Nomor Rekening Tabungan', $schema[1]->getLabel());
     }
 
+    public function test_kredit_schema_ignores_deprecated_loan_contract_reference(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'KREDIT',
+            'category_description' => 'Kredit',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'cif',
+            'label' => 'CIF',
+            'input_type' => 'text',
+            'sort_order' => 10,
+            'is_required' => true,
+            'is_primary_match_key' => false,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'loans',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'loan_account_no',
+            'label' => 'Nomor Rekening Kredit',
+            'input_type' => 'text',
+            'sort_order' => 20,
+            'is_required' => true,
+            'is_primary_match_key' => true,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'loans',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'loan_contract_no',
+            'label' => 'Nomor Perjanjian Kredit',
+            'input_type' => 'text',
+            'sort_order' => 30,
+            'is_required' => false,
+            'is_primary_match_key' => false,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'loans',
+        ]);
+
+        $schema = ArchiveResource::buildBusinessReferenceSchema($category->id);
+
+        $this->assertCount(2, $schema);
+        $this->assertSame('CIF', $schema[0]->getLabel());
+        $this->assertSame('Nomor Rekening Kredit', $schema[1]->getLabel());
+    }
+
     public function test_reference_sync_normalizes_values_and_records_dwh_match(): void
     {
         $category = Category::query()->create([

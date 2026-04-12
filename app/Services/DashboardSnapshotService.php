@@ -36,7 +36,12 @@ class DashboardSnapshotService
                 ->count(),
             'unlinked_supported_archives' => (clone $query)
                 ->whereIn('archive_category', $supportedCategoryIds)
-                ->doesntHave('businessReferences')
+                ->whereDoesntHave('businessReferences', function ($referenceQuery): void {
+                    $referenceQuery->whereNotIn(
+                        'reference_type',
+                        $this->archiveBusinessReferenceService->deprecatedReferenceTypes(),
+                    );
+                })
                 ->count(),
         ];
     }
