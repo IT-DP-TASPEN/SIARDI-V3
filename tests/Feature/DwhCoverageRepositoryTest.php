@@ -119,4 +119,55 @@ class DwhCoverageRepositoryTest extends TestCase
         $this->assertSame('001000000000002', $missing->first()['business_key']);
         $this->assertCount(1, $missing);
     }
+
+    public function test_search_reference_candidates_returns_exact_matches_with_reference_payload(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'cif',
+            'label' => 'CIF',
+            'input_type' => 'text',
+            'sort_order' => 10,
+            'is_required' => true,
+            'is_primary_match_key' => false,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'savings',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'savings_account_no',
+            'label' => 'Nomor Rekening Tabungan',
+            'input_type' => 'text',
+            'sort_order' => 20,
+            'is_required' => true,
+            'is_primary_match_key' => true,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'savings',
+        ]);
+
+        DB::connection('dwh')->table('raw_savings')->insert([
+            ['_row_key' => 'ROW-1', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100013785', 'norekening' => '001000000000001', 'status_dokumen' => 'Active'],
+            ['_row_key' => 'ROW-2', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100099999', 'norekening' => '001000000000999', 'status_dokumen' => 'Active'],
+        ]);
+
+        $candidates = app(DwhCoverageRepository::class)->searchReferenceCandidates(
+            $category,
+            '001',
+            [
+                'cif' => '00100013785',
+                'savings_account_no' => '001 000000000001',
+            ],
+        );
+
+        $this->assertCount(1, $candidates);
+        $this->assertSame('ROW-1', $candidates->first()['source_key']);
+        $this->assertSame('00100013785', $candidates->first()['reference_values']['cif']);
+        $this->assertSame('001000000000001', $candidates->first()['reference_values']['savings_account_no']);
+    }
 }

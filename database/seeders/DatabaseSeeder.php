@@ -17,8 +17,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             BranchOfficeSeeder::class,
             CategorySeeder::class,
-            CategoryReferenceFieldSeeder::class,
-            DwhBranchMappingSeeder::class,
+            BusinessReferenceConfigurationSeeder::class,
         ]);
 
         $adminBranchOffice = BranchOffice::query()->where('branch_code', '01')->first();

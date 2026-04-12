@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Archive;
 use App\Models\ArchiveBusinessReference;
+use App\Models\Category;
 use App\Models\CategoryReferenceField;
 use App\Repositories\DwhCoverageRepository;
 use App\Support\LegacyReferenceSuggestionParser;
@@ -96,5 +97,120 @@ class ArchiveBusinessReferenceService
     public function getLegacySuggestions(Archive $archive): array
     {
         return $this->legacyReferenceSuggestionParser->suggestionsForArchive($archive);
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $submittedReferences
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function lookupCandidatesForArchive(Archive $archive, array $submittedReferences): Collection
+    {
+        $archive->loadMissing(['category', 'branchOffice.dwhMapping']);
+
+        $filters = $this->getFieldDefinitionsForCategory($archive->archive_category)
+            ->mapWithKeys(function (CategoryReferenceField $field) use ($submittedReferences): array {
+                $value = ReferenceNormalizer::normalize(
+                    (string) ($submittedReferences[$field->id] ?? ''),
+                    $field->normalizer ?? 'uppercase_compact',
+                );
+
+                return [$field->reference_type => $value];
+            })
+            ->filter(fn (?string $value): bool => filled($value))
+            ->all();
+
+        if ($filters === [] || ! ($archive->category instanceof Category)) {
+            return collect();
+        }
+
+        $dwhLocationCode = $archive->branchOffice?->dwhMapping?->is_active
+            ? $archive->branchOffice?->dwhMapping?->dwh_location_code
+            : null;
+
+        return $this->dwhCoverageRepository->searchReferenceCandidates($archive->category, $dwhLocationCode, $filters);
+    }
+
+    /**
+     * @return array{label: string, color: string, tone: string, description: string}
+     */
+    public function getLinkageStatus(Archive $archive): array
+    {
+        $archive->loadMissing(['category', 'businessReferences.categoryReferenceField']);
+
+        if (! config('siardi.features.business_references')) {
+            return [
+                'label' => 'Feature Nonaktif',
+                'color' => 'gray',
+                'tone' => 'info',
+                'description' => 'Referensi bisnis belum diaktifkan pada environment ini.',
+            ];
+        }
+
+        $categoryName = $archive->category?->category_name;
+        $fields = $this->getFieldDefinitionsForCategory($archive->archive_category);
+
+        if (! $this->isSupportedCategoryName($categoryName)) {
+            return [
+                'label' => 'Legacy Only',
+                'color' => 'gray',
+                'tone' => 'info',
+                'description' => 'Kategori ini belum masuk scope rekonsiliasi DWH.',
+            ];
+        }
+
+        if ($fields->isEmpty()) {
+            return [
+                'label' => 'Konfigurasi Belum Aktif',
+                'color' => 'warning',
+                'tone' => 'warning',
+                'description' => 'Kategori ini didukung, tetapi field referensi bisnis belum dikonfigurasi.',
+            ];
+        }
+
+        if ($archive->businessReferences->isEmpty()) {
+            return [
+                'label' => 'Belum Ditautkan',
+                'color' => 'danger',
+                'tone' => 'danger',
+                'description' => 'Arsip belum memiliki referensi bisnis yang tersimpan.',
+            ];
+        }
+
+        $primaryFieldId = $fields->firstWhere('is_primary_match_key', true)?->id;
+        $primaryReference = $archive->businessReferences
+            ->first(fn (ArchiveBusinessReference $reference): bool => $reference->category_reference_field_id === $primaryFieldId);
+
+        if (! $primaryReference) {
+            return [
+                'label' => 'Referensi Belum Lengkap',
+                'color' => 'warning',
+                'tone' => 'warning',
+                'description' => 'Referensi utama untuk rekonsiliasi belum diisi.',
+            ];
+        }
+
+        if (filled($primaryReference->matched_source_key)) {
+            return [
+                'label' => 'Matched ke DWH',
+                'color' => 'success',
+                'tone' => 'success',
+                'description' => 'Referensi utama sudah berhasil dicocokkan dengan record DWH.',
+            ];
+        }
+
+        return [
+            'label' => 'Belum Match DWH',
+            'color' => 'warning',
+            'tone' => 'warning',
+            'description' => 'Referensi tersimpan, tetapi belum ada record DWH yang cocok.',
+        ];
+    }
+
+    private function isSupportedCategoryName(?string $categoryName): bool
+    {
+        return filled($categoryName) && array_key_exists(
+            $categoryName,
+            config('siardi.supported_reconciliation_categories', []),
+        );
     }
 }

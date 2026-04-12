@@ -134,7 +134,7 @@
                                 <td>
                                     <div class="space-y-1">
                                         <div class="font-medium text-gray-950 dark:text-white">{{ $row['branch_name'] }}</div>
-                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['branch_code'] }} | DWH {{ $row['dwh_location_code'] }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['dwh_location_code'] }}</div>
                                     </div>
                                 </td>
                                 <td>{{ $row['as_of_date'] }}</td>

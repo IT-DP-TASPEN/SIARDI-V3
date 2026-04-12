@@ -133,4 +133,37 @@ class ArchiveReferenceBehaviorTest extends TestCase
         $this->assertSame('raw_savings', $reference->matched_table);
         $this->assertSame('ROW-1', $reference->matched_source_key);
     }
+
+    public function test_linkage_status_reports_configuration_gap_for_supported_category_without_fields(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'Kantor Pusat Operasional',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Archive',
+            'archive_description' => 'Archive',
+            'archive_path' => 'archives/archive.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-10',
+        ]);
+
+        $status = app(ArchiveBusinessReferenceService::class)->getLinkageStatus($archive);
+
+        $this->assertSame('Konfigurasi Belum Aktif', $status['label']);
+        $this->assertSame('warning', $status['color']);
+    }
 }

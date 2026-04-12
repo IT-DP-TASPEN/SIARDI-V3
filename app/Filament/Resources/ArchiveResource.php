@@ -67,7 +67,13 @@ class ArchiveResource extends Resource
                     ->rows(5)
                     ->maxLength(255)
                     ->required(),
+                Forms\Components\Placeholder::make('business_reference_configuration_notice')
+                    ->label('Status Referensi Bisnis')
+                    ->content(fn (Get $get): HtmlString => static::businessReferenceConfigurationNotice((int) ($get('archive_category') ?: 0)) ?? new HtmlString(''))
+                    ->hidden(fn (Get $get): bool => static::businessReferenceConfigurationNotice((int) ($get('archive_category') ?: 0)) === null)
+                    ->columnSpanFull(),
                 FormSection::make('Referensi Bisnis')
+                    ->description(fn (Get $get): string => static::businessReferenceSectionDescription((int) ($get('archive_category') ?: 0)))
                     ->schema(fn (Get $get): array => static::buildBusinessReferenceSchema((int) ($get('archive_category') ?: 0)))
                     ->hidden(fn (Get $get): bool => static::businessReferenceFieldDefinitions((int) ($get('archive_category') ?: 0))->isEmpty())
                     ->columnSpanFull()
@@ -125,6 +131,11 @@ class ArchiveResource extends Resource
                     ->label('Referensi Utama')
                     ->state(fn (Archive $record): string => static::primaryReferenceValue($record))
                     ->searchable(false),
+                Tables\Columns\TextColumn::make('linkage_status')
+                    ->label('Status Linkage')
+                    ->state(fn (Archive $record): string => static::archiveLinkageStatus($record)['label'])
+                    ->badge()
+                    ->color(fn (Archive $record): string => static::archiveLinkageStatus($record)['color']),
                 Tables\Columns\TextColumn::make('archive_date')
                     ->label('Tanggal Arsip')
                     ->formatStateUsing(fn ($state): string => static::formatDateValue($state))
@@ -198,6 +209,11 @@ class ArchiveResource extends Resource
                                     ->label('Tanggal Arsip')
                                     ->formatStateUsing(fn ($state): string => static::formatDateValue($state)),
                                 TextEntry::make('archive_description')->label('Deskripsi'),
+                                TextEntry::make('linkage_status')
+                                    ->label('Status Linkage')
+                                    ->state(fn (Archive $record): string => static::archiveLinkageStatus($record)['label'])
+                                    ->badge()
+                                    ->color(fn (Archive $record): string => static::archiveLinkageStatus($record)['color']),
                                 TextEntry::make('business_references_html')
                                     ->label('Referensi Bisnis')
                                     ->state(fn (Archive $record): HtmlString => static::renderBusinessReferenceHtml($record))
@@ -312,6 +328,11 @@ class ArchiveResource extends Resource
         }
     }
 
+    public static function archiveLinkageStatus(Archive $record): array
+    {
+        return app(ArchiveBusinessReferenceService::class)->getLinkageStatus($record);
+    }
+
     private static function primaryReferenceValue(Archive $record): string
     {
         $record->loadMissing('businessReferences.categoryReferenceField');
@@ -324,10 +345,15 @@ class ArchiveResource extends Resource
 
     private static function renderBusinessReferenceHtml(Archive $record): HtmlString
     {
+        $status = static::archiveLinkageStatus($record);
         $record->loadMissing('businessReferences.categoryReferenceField');
 
         if ($record->businessReferences->isEmpty()) {
-            return new HtmlString('<span class="text-sm text-gray-500">Belum ada referensi bisnis.</span>');
+            return new HtmlString(sprintf(
+                '<div class="space-y-2"><span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">%s</span><p class="text-sm text-gray-500">%s</p></div>',
+                e($status['label']),
+                e($status['description']),
+            ));
         }
 
         $items = $record->businessReferences
@@ -340,7 +366,20 @@ class ArchiveResource extends Resource
             })
             ->implode('');
 
-        return new HtmlString("<ul class=\"list-disc pl-4\">{$items}</ul>");
+        $badgeClass = match ($status['color']) {
+            'success' => 'bg-success-100 text-success-700 dark:bg-success-500/20 dark:text-success-300',
+            'warning' => 'bg-warning-100 text-warning-700 dark:bg-warning-500/20 dark:text-warning-300',
+            'danger' => 'bg-danger-100 text-danger-700 dark:bg-danger-500/20 dark:text-danger-300',
+            default => 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200',
+        };
+
+        return new HtmlString(
+            "<div class=\"space-y-3\">".
+                "<div class=\"inline-flex items-center rounded-full px-3 py-1 text-xs font-medium {$badgeClass}\">".e($status['label']).'</div>'.
+                '<p class="text-sm text-gray-500">'.e($status['description']).'</p>'.
+                "<ul class=\"list-disc pl-4\">{$items}</ul>".
+            '</div>',
+        );
     }
 
     private static function renderArchivePreviewHtml(Archive $record): HtmlString
@@ -363,5 +402,57 @@ class ArchiveResource extends Resource
         }
 
         return new HtmlString("<a href=\"{$url}\" target=\"_blank\" class=\"text-primary-600 underline\">Download Arsip</a>");
+    }
+
+    private static function businessReferenceConfigurationNotice(?int $categoryId): ?HtmlString
+    {
+        if (! $categoryId || ! config('siardi.features.business_references')) {
+            return null;
+        }
+
+        $categoryName = Category::query()->whereKey($categoryId)->value('category_name');
+
+        if (! filled($categoryName) || ! array_key_exists($categoryName, config('siardi.supported_reconciliation_categories', []))) {
+            return null;
+        }
+
+        if (static::businessReferenceFieldDefinitions($categoryId)->isNotEmpty()) {
+            return null;
+        }
+
+        return new HtmlString(
+            'Kategori ini sudah masuk scope rekonsiliasi, tetapi field referensi bisnis belum aktif. '.
+            'Jalankan <code>php artisan db:seed --class=BusinessReferenceConfigurationSeeder --force</code> di environment target.',
+        );
+    }
+
+    private static function businessReferenceSectionDescription(?int $categoryId): string
+    {
+        if (! $categoryId) {
+            return 'Pilih kategori arsip untuk menampilkan field referensi bisnis yang sesuai.';
+        }
+
+        $fields = static::businessReferenceFieldDefinitions($categoryId);
+
+        if ($fields->isEmpty()) {
+            $categoryName = Category::query()->whereKey($categoryId)->value('category_name');
+
+            if (filled($categoryName) && array_key_exists($categoryName, config('siardi.supported_reconciliation_categories', []))) {
+                return 'Kategori ini sudah didukung untuk rekonsiliasi, tetapi field referensi bisnis belum dikonfigurasi.';
+            }
+
+            return 'Kategori ini tetap menggunakan perilaku legacy tanpa field referensi bisnis tambahan.';
+        }
+
+        $primaryField = $fields->firstWhere('is_primary_match_key', true);
+
+        if (! $primaryField) {
+            return 'Isi referensi bisnis yang relevan agar arsip dapat direkonsiliasi dengan DWH.';
+        }
+
+        return sprintf(
+            'Isi seluruh referensi bisnis. Primary match key untuk kategori ini adalah "%s".',
+            $primaryField->label,
+        );
     }
 }

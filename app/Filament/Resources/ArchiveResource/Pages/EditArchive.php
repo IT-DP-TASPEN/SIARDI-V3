@@ -75,7 +75,22 @@ class EditArchive extends EditRecord
 
     protected function afterSave(): void
     {
-        app(ArchiveBusinessReferenceService::class)->syncForArchive($this->record, $this->referenceFormData);
+        $service = app(ArchiveBusinessReferenceService::class);
+        $service->syncForArchive($this->record, $this->referenceFormData);
+
+        $status = $service->getLinkageStatus($this->record);
+        $notification = Notification::make()
+            ->title('Status referensi bisnis')
+            ->body($status['description']);
+
+        match ($status['tone']) {
+            'success' => $notification->success(),
+            'warning' => $notification->warning(),
+            'danger' => $notification->danger(),
+            default => $notification->info(),
+        };
+
+        $notification->send();
     }
 
     protected function getHeaderActions(): array

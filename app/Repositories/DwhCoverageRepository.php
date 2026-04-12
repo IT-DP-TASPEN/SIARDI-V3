@@ -224,6 +224,64 @@ class DwhCoverageRepository
     }
 
     /**
+     * @param  array<string, string>  $filters
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function searchReferenceCandidates(Category|int $category, ?string $dwhLocationCode, array $filters, int $limit = 10): Collection
+    {
+        $category = $category instanceof Category ? $category : Category::query()->find($category);
+        $definition = $category ? $this->resolveDefinition($category) : null;
+
+        if (! $category || $definition === null) {
+            return collect();
+        }
+
+        $filters = collect($filters)
+            ->filter(fn (mixed $value): bool => filled($value))
+            ->map(fn (mixed $value): string => strtoupper((string) preg_replace('/\s+/', '', trim((string) $value))))
+            ->all();
+
+        if ($filters === []) {
+            return collect();
+        }
+
+        $asOfDate = $this->getLatestSnapshotDateForCategory($category);
+
+        if (! $asOfDate) {
+            return collect();
+        }
+
+        $baseQuery = $this->buildCandidateQuery($category, $asOfDate, $dwhLocationCode);
+        $exactMatches = $this->mapCandidateRows(
+            $this->applyCandidateFilters(clone $baseQuery, $definition, $filters)
+                ->limit($limit)
+                ->get(),
+            $definition,
+        );
+
+        if ($exactMatches->isNotEmpty()) {
+            return $exactMatches;
+        }
+
+        $primaryReferenceType = $category->referenceFields()
+            ->where('is_primary_match_key', true)
+            ->value('reference_type');
+
+        $primaryValue = $primaryReferenceType ? ($filters[$primaryReferenceType] ?? null) : null;
+
+        if (! $primaryValue || strlen($primaryValue) < 6) {
+            return collect();
+        }
+
+        return $this->mapCandidateRows(
+            $this->applyCandidateFilters(clone $baseQuery, $definition, $filters, true, $primaryReferenceType)
+                ->limit($limit)
+                ->get(),
+            $definition,
+        );
+    }
+
+    /**
      * @return Collection<int, string>
      */
     public function getAvailableSnapshotDatesForCategory(int $categoryId, int $limit = 30): Collection
@@ -242,6 +300,92 @@ class DwhCoverageRepository
             ->orderByDesc('as_of_date')
             ->limit($limit)
             ->pluck('as_of_date');
+    }
+
+    private function buildCandidateQuery(Category $category, ?string $asOfDate, ?string $dwhLocationCode = null): QueryBuilder
+    {
+        $definition = $this->resolveDefinition($category);
+        $query = $this->buildTargetQuery($category, $asOfDate, $dwhLocationCode)
+            ->select($this->candidateSelects($definition))
+            ->orderBy($definition['business_key_column']);
+
+        return $query;
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @param  array<string, string>  $filters
+     */
+    private function applyCandidateFilters(
+        QueryBuilder $query,
+        array $definition,
+        array $filters,
+        bool $allowPrimaryPrefixFallback = false,
+        ?string $primaryReferenceType = null,
+    ): QueryBuilder {
+        foreach ($filters as $referenceType => $value) {
+            $column = $definition['reference_columns'][$referenceType] ?? null;
+
+            if (! $column) {
+                continue;
+            }
+
+            $operator = $allowPrimaryPrefixFallback && $referenceType === $primaryReferenceType ? 'like' : '=';
+            $comparisonValue = $operator === 'like' ? $value.'%' : $value;
+
+            $query->whereRaw("{$this->normalizedSql($column)} {$operator} ?", [$comparisonValue]);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @return array<int, string>
+     */
+    private function candidateSelects(array $definition): array
+    {
+        $selects = [
+            $definition['source_key_column'].' as source_key',
+            'as_of_date',
+            $definition['branch_column'].' as dwh_location_code',
+            $definition['cif_column'].' as cif',
+            $definition['business_key_column'].' as business_key',
+            $definition['status_column'].' as status',
+        ];
+
+        foreach ($definition['reference_columns'] as $referenceType => $column) {
+            $selects[] = $column.' as '.$referenceType;
+        }
+
+        return $selects;
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function mapCandidateRows(Collection $rows, array $definition): Collection
+    {
+        return $rows
+            ->map(function ($row) use ($definition): array {
+                $data = (array) $row;
+
+                return [
+                    'source_key' => (string) ($data['source_key'] ?? ''),
+                    'as_of_date' => (string) ($data['as_of_date'] ?? ''),
+                    'dwh_location_code' => (string) ($data['dwh_location_code'] ?? ''),
+                    'cif' => (string) ($data['cif'] ?? ''),
+                    'business_key' => (string) ($data['business_key'] ?? ''),
+                    'status' => (string) ($data['status'] ?? ''),
+                    'reference_values' => collect(array_keys($definition['reference_columns']))
+                        ->mapWithKeys(fn (string $referenceType): array => [$referenceType => (string) ($data[$referenceType] ?? '')])
+                        ->all(),
+                ];
+            })
+            ->filter(fn (array $row): bool => filled($row['source_key']))
+            ->unique('source_key')
+            ->values();
     }
 
     private function buildTargetQuery(Category $category, ?string $asOfDate, ?string $dwhLocationCode = null): QueryBuilder

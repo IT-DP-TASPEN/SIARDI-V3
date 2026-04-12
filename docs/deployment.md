@@ -39,8 +39,7 @@ php artisan migrate --force
 5. Seed only the additive lookup data needed for the new features:
 
 ```bash
-php artisan db:seed --class=CategoryReferenceFieldSeeder --force
-php artisan db:seed --class=DwhBranchMappingSeeder --force
+php artisan db:seed --class=BusinessReferenceConfigurationSeeder --force
 ```
 
 6. Install and build frontend assets so the Filament panel theme manifest exists:
