@@ -7,7 +7,6 @@ use App\Models\Archive;
 use App\Models\Category;
 use App\Models\User;
 use App\Repositories\DwhCoverageRepository;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +14,7 @@ class DashboardSnapshotService
 {
     public function __construct(
         private readonly ArchiveBusinessReferenceService $archiveBusinessReferenceService,
+        private readonly ArchiveVisibilityService $archiveVisibilityService,
         private readonly DwhCoverageRepository $dwhCoverageRepository,
     ) {}
 
@@ -105,7 +105,7 @@ class DashboardSnapshotService
             return [
                 'enabled' => false,
                 'available' => false,
-                'message' => 'Rekonsiliasi DWH nonaktif.',
+                'message' => 'Target dan realisasi nonaktif.',
                 'target_total' => 0,
                 'realized_total' => 0,
                 'missing_total' => 0,
@@ -119,7 +119,7 @@ class DashboardSnapshotService
             return [
                 'enabled' => true,
                 'available' => false,
-                'message' => 'DWH unavailable. Periksa koneksi read-only DWH.',
+                'message' => 'Data target unavailable. Periksa koneksi read-only sumber data.',
                 'target_total' => 0,
                 'realized_total' => 0,
                 'missing_total' => 0,
@@ -134,7 +134,7 @@ class DashboardSnapshotService
         return [
             'enabled' => true,
             'available' => true,
-            'message' => $summary->isEmpty() ? 'Belum ada data coverage untuk scope user ini.' : null,
+            'message' => $summary->isEmpty() ? 'Belum ada data target dan realisasi untuk scope user ini.' : null,
             'target_total' => $targetTotal,
             'realized_total' => $realizedTotal,
             'missing_total' => $missingTotal,
@@ -162,22 +162,12 @@ class DashboardSnapshotService
         }
     }
 
-    private function visibleArchivesQuery(User $user): Builder
+    private function visibleArchivesQuery(User $user): \Illuminate\Database\Eloquent\Builder
     {
-        $query = Archive::query()->with(['category', 'branchOffice']);
-
-        if ($user->isAdmin()) {
-            return $query;
-        }
-
-        $permittedCategoryIds = $user->permittedCategories()->pluck('categories.id')->all();
-        $query->whereIn('archive_category', $permittedCategoryIds);
-
-        if (! $user->hasRole(['staff', 'it'])) {
-            $query->where('archive_branch_office', $user->branch_office_id);
-        }
-
-        return $query;
+        return $this->archiveVisibilityService->applyArchiveScope(
+            Archive::query()->with(['category', 'branchOffice']),
+            $user,
+        );
     }
 
     /**
@@ -185,24 +175,10 @@ class DashboardSnapshotService
      */
     private function visibleCoverageSummary(User $user): Collection
     {
-        $summary = $this->dwhCoverageRepository->getCoverageSummary();
-
-        if ($user->isAdmin()) {
-            return $summary;
-        }
-
-        $permittedCategoryIds = $user->permittedCategories()->pluck('categories.id')->all();
-        $summary = $summary
-            ->whereIn('category_id', $permittedCategoryIds)
-            ->values();
-
-        if ($user->hasRole(['staff', 'it'])) {
-            return $summary;
-        }
-
-        return $summary
-            ->where('branch_office_id', $user->branch_office_id)
-            ->values();
+        return $this->archiveVisibilityService->filterCoverageRows(
+            $this->dwhCoverageRepository->getCoverageSummary(),
+            $user,
+        );
     }
 
     /**

@@ -74,6 +74,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'branch_office_id' => $branch->id,
         ]);
         $user->roles()->attach($adminRole->id);
+        $user->permittedCategories()->attach($category->id);
 
         DwhBranchMapping::query()->create([
             'branch_office_id' => $branch->id,

@@ -54,7 +54,7 @@ class Dashboard extends BaseDashboard
                 ->icon('heroicon-o-presentation-chart-line')
                 ->url(RekapanArsip::getUrl()),
             Action::make('dwhCoverage')
-                ->label('DWH Coverage')
+                ->label('Target & Realisasi')
                 ->color('primary')
                 ->icon('heroicon-o-chart-bar-square')
                 ->url(DwhCoverageDashboard::getUrl())

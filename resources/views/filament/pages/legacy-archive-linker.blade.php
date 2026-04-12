@@ -77,7 +77,7 @@
 
         <x-filament::section
             heading="Arsip Legacy Belum Tertaut"
-            description="Antrian kerja untuk arsip existing yang masih belum memiliki business reference."
+            description="Antrian kerja untuk arsip existing yang masih belum memiliki referensi bisnis."
             icon="heroicon-o-document-magnifying-glass"
         >
             <x-slot name="afterHeader">
@@ -163,7 +163,7 @@
                                     </x-filament::badge>
                                     @if ($selectedArchive->branchOffice?->dwhMapping?->is_active)
                                         <x-filament::badge color="success">
-                                            DWH {{ $selectedArchive->branchOffice->dwhMapping->dwh_location_code }}
+                                            Kode Target {{ $selectedArchive->branchOffice->dwhMapping->dwh_location_code }}
                                         </x-filament::badge>
                                     @else
                                         <x-filament::badge color="warning">Tanpa Mapping Cabang Aktif</x-filament::badge>
@@ -181,12 +181,12 @@
 
                     @if ($referenceFields->isEmpty())
                         <div class="rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-200">
-                            Kategori ini belum memiliki konfigurasi referensi bisnis. Arsip tetap aman sebagai legacy document, tetapi belum bisa dilink ke target rekonsiliasi sampai konfigurasi field diaktifkan.
+                            Kategori ini belum memiliki konfigurasi referensi bisnis. Arsip tetap aman sebagai legacy document, tetapi belum bisa dilink ke target dan realisasi sampai konfigurasi field diaktifkan.
                         </div>
                     @else
                         @if (! $selectedArchive->branchOffice?->dwhMapping?->is_active)
                             <div class="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
-                                Cabang arsip ini belum punya mapping DWH aktif. Lookup kandidat tetap bisa dijalankan, tetapi tidak akan dibatasi ke satu cabang DWH tertentu.
+                                Cabang arsip ini belum punya mapping target aktif. Lookup kandidat tetap bisa dijalankan, tetapi tidak akan dibatasi ke satu kode target tertentu.
                             </div>
                         @endif
 
@@ -220,7 +220,7 @@
 
                         <div class="flex flex-wrap justify-end gap-3">
                             <x-filament::button type="button" color="gray" wire:click="lookupCandidates" wire:loading.attr="disabled">
-                                Cari Kandidat DWH
+                                Cari Kandidat
                             </x-filament::button>
                             <x-filament::button type="button" color="primary" wire:click="saveReferences" wire:loading.attr="disabled">
                                 Simpan Referensi
@@ -230,7 +230,7 @@
                         <div class="siardi-surface-card">
                             <div class="siardi-panel-split">
                                 <div class="min-w-0 flex-1">
-                                    <h4 class="text-sm font-semibold text-gray-950 dark:text-white">Kandidat DWH</h4>
+                                    <h4 class="text-sm font-semibold text-gray-950 dark:text-white">Kandidat Data</h4>
                                     <p class="text-sm text-gray-500 dark:text-gray-400">
                                         Isi satu atau lebih field referensi, lalu cari kandidat untuk mempercepat linking.
                                     </p>
@@ -246,11 +246,11 @@
 
                             @if (! $hasLookedUpCandidates)
                                 <div class="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                                    Belum ada pencarian kandidat. Gunakan input referensi di atas lalu klik <strong>Cari Kandidat DWH</strong>.
+                                    Belum ada pencarian kandidat. Gunakan input referensi di atas lalu klik <strong>Cari Kandidat</strong>.
                                 </div>
                             @elseif (empty($candidateResults))
                                 <div class="mt-4 text-sm text-warning-700 dark:text-warning-300">
-                                    Tidak ada kandidat DWH yang cocok dengan input saat ini.
+                                    Tidak ada kandidat data yang cocok dengan input saat ini.
                                 </div>
                             @else
                                 <div class="mt-4 space-y-3">
@@ -261,7 +261,7 @@
                                                     <div class="flex flex-wrap gap-2">
                                                         <x-filament::badge color="success">{{ $candidate['business_key'] }}</x-filament::badge>
                                                         <x-filament::badge color="gray">CIF {{ $candidate['cif'] ?: '-' }}</x-filament::badge>
-                                                        <x-filament::badge color="primary">DWH {{ $candidate['dwh_location_code'] ?: '-' }}</x-filament::badge>
+                                                        <x-filament::badge color="primary">Kode Target {{ $candidate['dwh_location_code'] ?: '-' }}</x-filament::badge>
                                                         <x-filament::badge color="gray">{{ $candidate['status'] ?: 'Tanpa status' }}</x-filament::badge>
                                                     </div>
                                                     <div class="text-sm text-gray-600 dark:text-gray-300">

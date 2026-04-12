@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ArchiveResource\Pages;
 use App\Models\Archive;
+use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Services\ArchiveBusinessReferenceService;
+use App\Services\ArchiveVisibilityService;
 use App\Support\ReferenceNormalizer;
 use Carbon\Carbon;
 use Filament\Actions\BulkActionGroup;
@@ -155,11 +157,11 @@ class ArchiveResource extends Resource
                     ->preload(),
                 Tables\Filters\SelectFilter::make('archive_branch_office')
                     ->label('Cabang')
-                    ->relationship('branchOffice', 'branch_name')
+                    ->options(fn (): array => static::getBranchOptions())
                     ->searchable()
                     ->multiple()
                     ->preload()
-                    ->visible(fn (): bool => auth()->user()?->isAdmin() ?? false),
+                    ->visible(fn (): bool => app(ArchiveVisibilityService::class)->canViewAllBranches(auth()->user())),
                 Tables\Filters\Filter::make('reference_value')
                     ->label('Referensi Bisnis')
                     ->form([
@@ -246,17 +248,7 @@ class ArchiveResource extends Resource
             return $query;
         }
 
-        if ($user->isAdmin()) {
-            return $query;
-        }
-
-        if ($user->hasRole(['staff', 'it'])) {
-            return $query->whereIn('archive_category', $user->permittedCategories()->pluck('categories.id'));
-        }
-
-        return $query
-            ->whereIn('archive_category', $user->permittedCategories()->pluck('categories.id'))
-            ->where('archive_branch_office', $user->branch_office_id);
+        return app(ArchiveVisibilityService::class)->applyArchiveScope($query, $user);
     }
 
     public static function getPages(): array
@@ -307,12 +299,39 @@ class ArchiveResource extends Resource
     public static function getCategoryOptions(): array
     {
         $user = auth()->user();
+        $visibleCategoryIds = app(ArchiveVisibilityService::class)->visibleCategoryIds($user);
 
-        if (! $user || $user->isAdmin()) {
-            return Category::query()->orderBy('category_name')->pluck('category_name', 'id')->all();
+        if ($visibleCategoryIds === []) {
+            return [];
         }
 
-        return $user->permittedCategories()->orderBy('category_name')->pluck('category_name', 'categories.id')->all();
+        return Category::query()
+            ->whereIn('id', $visibleCategoryIds)
+            ->orderBy('category_name')
+            ->pluck('category_name', 'id')
+            ->all();
+    }
+
+    /**
+     * @return array<int|string, string>
+     */
+    public static function getBranchOptions(): array
+    {
+        $user = auth()->user();
+        $visibleBranchOfficeIds = app(ArchiveVisibilityService::class)->visibleBranchOfficeIds($user);
+
+        if ($visibleBranchOfficeIds === []) {
+            return [];
+        }
+
+        return BranchOffice::query()
+            ->whereIn('id', $visibleBranchOfficeIds)
+            ->orderBy('branch_code')
+            ->get()
+            ->mapWithKeys(fn (BranchOffice $branch): array => [
+                $branch->id => trim($branch->branch_code.' - '.$branch->branch_name),
+            ])
+            ->all();
     }
 
     public static function formatDateValue(mixed $value): string
@@ -421,7 +440,7 @@ class ArchiveResource extends Resource
         }
 
         return new HtmlString(
-            'Kategori ini sudah masuk scope rekonsiliasi, tetapi field referensi bisnis belum aktif. '.
+            'Kategori ini sudah masuk scope target dan realisasi, tetapi field referensi bisnis belum aktif. '.
             'Jalankan <code>php artisan db:seed --class=BusinessReferenceConfigurationSeeder --force</code> di environment target.',
         );
     }
@@ -438,7 +457,7 @@ class ArchiveResource extends Resource
             $categoryName = Category::query()->whereKey($categoryId)->value('category_name');
 
             if (filled($categoryName) && array_key_exists($categoryName, config('siardi.supported_reconciliation_categories', []))) {
-                return 'Kategori ini sudah didukung untuk rekonsiliasi, tetapi field referensi bisnis belum dikonfigurasi.';
+                return 'Kategori ini sudah didukung untuk target dan realisasi, tetapi field referensi bisnis belum dikonfigurasi.';
             }
 
             return 'Kategori ini tetap menggunakan perilaku legacy tanpa field referensi bisnis tambahan.';
@@ -447,7 +466,7 @@ class ArchiveResource extends Resource
         $primaryField = $fields->firstWhere('is_primary_match_key', true);
 
         if (! $primaryField) {
-            return 'Isi referensi bisnis yang relevan agar arsip dapat direkonsiliasi dengan DWH.';
+            return 'Isi referensi bisnis yang relevan agar arsip dapat direkonsiliasi dengan data target.';
         }
 
         return sprintf(

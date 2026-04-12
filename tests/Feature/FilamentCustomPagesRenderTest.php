@@ -37,7 +37,8 @@ class FilamentCustomPagesRenderTest extends TestCase
             ->assertSee('Ringkasan Arsip')
             ->assertSee('Trend Upload Arsip')
             ->assertSee('Arsip Terbaru')
-            ->assertSee('Ringkasan Coverage DWH');
+            ->assertSee('Ringkasan Target & Realisasi')
+            ->assertDontSee('DWH');
     }
 
     public function test_dashboard_page_renders_degraded_dwh_state_without_crashing(): void
@@ -51,7 +52,7 @@ class FilamentCustomPagesRenderTest extends TestCase
 
         DwhBranchMapping::query()->create([
             'branch_office_id' => $user->branch_office_id,
-            'siardi_branch_code' => '01',
+            'siardi_branch_code' => '00',
             'dwh_location_code' => '001',
             'dwh_location_name' => 'Kantor Pusat Operasional',
             'is_active' => true,
@@ -60,8 +61,9 @@ class FilamentCustomPagesRenderTest extends TestCase
         $this->actingAs($user)
             ->get('/arsip_digital')
             ->assertOk()
-            ->assertSee('Ringkasan Coverage DWH')
-            ->assertSee('DWH unavailable');
+            ->assertSee('Ringkasan Target & Realisasi')
+            ->assertSee('Data target unavailable')
+            ->assertDontSee('DWH');
     }
 
     public function test_dashboard_hides_dwh_widgets_when_reconciliation_feature_is_disabled(): void
@@ -75,8 +77,8 @@ class FilamentCustomPagesRenderTest extends TestCase
             ->assertOk()
             ->assertSee('SIARDI Dashboard')
             ->assertSee('Ringkasan Arsip')
-            ->assertDontSee('Ringkasan Coverage DWH')
-            ->assertDontSee('Coverage Terendah');
+            ->assertDontSee('Ringkasan Target & Realisasi')
+            ->assertDontSee('Realisasi Terendah');
     }
 
     public function test_dwh_coverage_page_renders_with_empty_state(): void
@@ -86,8 +88,9 @@ class FilamentCustomPagesRenderTest extends TestCase
         $this->actingAs($user)
             ->get('/arsip_digital/dwh-coverage-dashboard')
             ->assertOk()
-            ->assertSee('Filter Rekonsiliasi')
-            ->assertSee('Belum ada data rekonsiliasi.');
+            ->assertSee('Filter Target & Realisasi')
+            ->assertSee('Belum ada data target dan realisasi.')
+            ->assertDontSee('DWH');
     }
 
     public function test_legacy_linking_page_renders_with_empty_state(): void
@@ -99,6 +102,7 @@ class FilamentCustomPagesRenderTest extends TestCase
             ->assertOk()
             ->assertSee('Filter Arsip Legacy')
             ->assertSee('Tidak ada arsip legacy yang cocok.')
+            ->assertDontSee('DWH')
             ->assertSee('legacy-linking-modal', false)
             ->assertDontSee('legacy-linking-workspace', false);
     }
@@ -106,8 +110,8 @@ class FilamentCustomPagesRenderTest extends TestCase
     private function createAdminUser(): User
     {
         $branch = BranchOffice::query()->create([
-            'branch_code' => '01',
-            'branch_name' => 'Kantor Pusat Operasional',
+            'branch_code' => '00',
+            'branch_name' => 'Kantor Pusat Manajemen',
         ]);
 
         $role = Role::query()->create([

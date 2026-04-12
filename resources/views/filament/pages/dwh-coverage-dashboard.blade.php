@@ -9,8 +9,8 @@
 
     <div class="siardi-page-stack">
         <x-filament::section
-            heading="Filter Rekonsiliasi"
-            description="Gunakan filter kategori dan cabang untuk memeriksa coverage arsip terhadap data mirror DWH yang diperbarui harian."
+            heading="Filter Target & Realisasi"
+            description="Gunakan filter kategori dan cabang untuk memeriksa target dan realisasi arsip terhadap data target harian."
             icon="heroicon-o-funnel"
         >
             <x-slot name="afterHeader">
@@ -49,18 +49,18 @@
         </x-filament::section>
 
         <x-filament::section
-            heading="Ringkasan Coverage"
-            description="Target dihitung dari seluruh distinct business record yang ada di mirror DWH per cabang dan kategori, realized dihitung dari distinct business record yang sudah tertaut di SIARDI."
+            heading="Ringkasan Target & Realisasi"
+            description="Target dihitung dari seluruh distinct business record per cabang dan kategori, realisasi dihitung dari distinct business record yang sudah tertaut di SIARDI."
             icon="heroicon-o-chart-bar-square"
         >
             <div class="siardi-stat-grid">
                 <div class="siardi-stat-card">
                     <p class="siardi-stat-label">Target</p>
                     <p class="siardi-stat-value">{{ number_format($targetTotal) }}</p>
-                    <p class="siardi-stat-meta">Total record target dari DWH.</p>
+                    <p class="siardi-stat-meta">Total record target.</p>
                 </div>
                 <div class="siardi-stat-card">
-                    <p class="siardi-stat-label">Realized</p>
+                    <p class="siardi-stat-label">Realisasi</p>
                     <p class="siardi-stat-value">{{ number_format($realizedTotal) }}</p>
                     <p class="siardi-stat-meta">Distinct record yang sudah tertaut di SIARDI.</p>
                 </div>
@@ -78,8 +78,8 @@
         </x-filament::section>
 
         <x-filament::section
-            heading="Coverage Per Cabang"
-            description="Rincian target, realized, dan missing untuk tiap kombinasi kategori dan cabang."
+            heading="Rekap Per Cabang"
+            description="Rincian target, realisasi, dan missing untuk tiap kombinasi kategori dan cabang."
             icon="heroicon-o-table-cells"
         >
             <div class="siardi-table-shell">
@@ -89,7 +89,7 @@
                             <th>Kategori</th>
                             <th>Cabang</th>
                             <th class="text-right">Target</th>
-                            <th class="text-right">Realized</th>
+                            <th class="text-right">Realisasi</th>
                             <th class="text-right">Missing</th>
                             <th class="text-right">Coverage</th>
                             <th class="text-right">Aksi</th>
@@ -111,7 +111,7 @@
                                 <td>
                                     <div class="space-y-1">
                                         <div class="font-medium text-gray-950 dark:text-white">{{ $row['branch_name'] }}</div>
-                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['dwh_location_code'] }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">Kode Target {{ $row['dwh_location_code'] }}</div>
                                     </div>
                                 </td>
                                 <td class="text-right">{{ number_format($row['target_count']) }}</td>
@@ -134,14 +134,14 @@
                                         size="sm"
                                         wire:click="openDrilldown({{ $row['category_id'] }}, {{ $row['branch_office_id'] }})"
                                     >
-                                        Missing Detail
+                                        Lihat Detail
                                     </x-filament::button>
                                 </td>
                             </tr>
                         @empty
                             <tr>
                                 <td colspan="7">
-                                    <div class="siardi-empty">Belum ada data rekonsiliasi.</div>
+                                    <div class="siardi-empty">Belum ada data target dan realisasi.</div>
                                 </td>
                             </tr>
                         @endforelse
@@ -152,8 +152,8 @@
 
         @if ($drilldownCategoryId && $drilldownBranchOfficeId)
             <x-filament::section
-                heading="Missing Records"
-                description="Daftar record DWH yang masuk target tetapi belum memiliki referensi arsip terhubung di SIARDI."
+                heading="Data Belum Tertaut"
+                description="Daftar record target yang masuk hitungan tetapi belum memiliki referensi arsip terhubung di SIARDI."
                 icon="heroicon-o-exclamation-triangle"
             >
                 @if ($missingRows->isNotEmpty())
@@ -184,7 +184,7 @@
                         </table>
                     </div>
                 @else
-                    <div class="siardi-empty">Tidak ada missing record untuk filter yang dipilih.</div>
+                    <div class="siardi-empty">Tidak ada data yang belum tertaut untuk filter yang dipilih.</div>
                 @endif
             </x-filament::section>
         @endif

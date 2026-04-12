@@ -154,7 +154,7 @@ class ArchiveBusinessReferenceService
                 'label' => 'Legacy Only',
                 'color' => 'gray',
                 'tone' => 'info',
-                'description' => 'Kategori ini belum masuk scope rekonsiliasi DWH.',
+                'description' => 'Kategori ini belum masuk scope target dan realisasi.',
             ];
         }
 
@@ -191,18 +191,18 @@ class ArchiveBusinessReferenceService
 
         if (filled($primaryReference->matched_source_key)) {
             return [
-                'label' => 'Matched ke DWH',
+                'label' => 'Matched ke Data Target',
                 'color' => 'success',
                 'tone' => 'success',
-                'description' => 'Referensi utama sudah berhasil dicocokkan dengan record DWH.',
+                'description' => 'Referensi utama sudah berhasil dicocokkan dengan data target.',
             ];
         }
 
         return [
-            'label' => 'Belum Match DWH',
+            'label' => 'Belum Match Data Target',
             'color' => 'warning',
             'tone' => 'warning',
-            'description' => 'Referensi tersimpan, tetapi belum ada record DWH yang cocok.',
+            'description' => 'Referensi tersimpan, tetapi belum ada data target yang cocok.',
         ];
     }
 

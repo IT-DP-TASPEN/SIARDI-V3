@@ -157,6 +157,11 @@ class DashboardSnapshotServiceTest extends TestCase
             'branch_name' => 'KC Bogor',
         ]);
 
+        $headOffice = BranchOffice::query()->create([
+            'branch_code' => '00',
+            'branch_name' => 'Kantor Pusat Manajemen',
+        ]);
+
         DwhBranchMapping::query()->create([
             'branch_office_id' => $branchOne->id,
             'siardi_branch_code' => '01',
@@ -179,7 +184,7 @@ class DashboardSnapshotServiceTest extends TestCase
         ]);
 
         $admin = User::factory()->create([
-            'branch_office_id' => $branchOne->id,
+            'branch_office_id' => $headOffice->id,
         ]);
         $admin->roles()->attach($adminRole->id);
 

@@ -3,11 +3,13 @@
 namespace App\Filament\Pages;
 
 use App\Models\Archive;
-use App\Models\Category;
 use App\Models\BranchOffice;
+use App\Models\Category;
 use App\Services\ArchiveBusinessReferenceService;
+use App\Services\ArchiveVisibilityService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\Builder;
 
 class LegacyArchiveLinker extends Page
 {
@@ -64,7 +66,7 @@ class LegacyArchiveLinker extends Page
 
     public function selectArchive(int $archiveId): void
     {
-        $archive = Archive::query()->with(['category', 'branchOffice.dwhMapping'])->findOrFail($archiveId);
+        $archive = $this->selectedArchiveQuery()->findOrFail($archiveId);
         $service = app(ArchiveBusinessReferenceService::class);
         $fields = $service->getFieldDefinitionsForCategory($archive->archive_category);
         $this->suggestions = $service->getLegacySuggestions($archive);
@@ -110,7 +112,7 @@ class LegacyArchiveLinker extends Page
             return;
         }
 
-        $archive = Archive::query()->with(['category', 'branchOffice.dwhMapping'])->findOrFail($this->selectedArchiveId);
+        $archive = $this->selectedArchiveQuery()->findOrFail($this->selectedArchiveId);
         $this->candidateResults = app(ArchiveBusinessReferenceService::class)
             ->lookupCandidatesForArchive($archive, $this->referenceInputs)
             ->all();
@@ -123,7 +125,7 @@ class LegacyArchiveLinker extends Page
             return;
         }
 
-        $archive = Archive::query()->findOrFail($this->selectedArchiveId);
+        $archive = $this->selectedArchiveQuery()->findOrFail($this->selectedArchiveId);
         $fields = app(ArchiveBusinessReferenceService::class)->getFieldDefinitionsForCategory($archive->archive_category);
         $candidate = $this->candidateResults[$candidateIndex];
 
@@ -141,7 +143,7 @@ class LegacyArchiveLinker extends Page
     {
         $this->validate($this->referenceValidationRules(), [], $this->referenceValidationAttributes());
 
-        $archive = Archive::query()->findOrFail($this->selectedArchiveId);
+        $archive = $this->selectedArchiveQuery()->findOrFail($this->selectedArchiveId);
         app(ArchiveBusinessReferenceService::class)->syncForArchive($archive, $this->referenceInputs);
 
         Notification::make()
@@ -156,16 +158,19 @@ class LegacyArchiveLinker extends Page
     protected function getViewData(): array
     {
         $service = app(ArchiveBusinessReferenceService::class);
+        $visibility = app(ArchiveVisibilityService::class);
+        $user = auth()->user();
+        $visibleCategoryIds = $visibility->visibleCategoryIds($user);
+        $visibleBranchOfficeIds = $visibility->visibleBranchOfficeIds($user);
         $selectedArchive = $this->selectedArchiveId
-            ? Archive::query()->with(['category', 'branchOffice.dwhMapping'])->find($this->selectedArchiveId)
+            ? $this->selectedArchiveQuery()->find($this->selectedArchiveId)
             : null;
         $referenceFields = $selectedArchive
             ? $service->getFieldDefinitionsForCategory($selectedArchive->archive_category)
             : collect();
 
         return [
-            'archives' => Archive::query()
-                ->with(['category', 'branchOffice'])
+            'archives' => $this->scopedArchivesQuery()
                 ->doesntHave('businessReferences')
                 ->when($this->categoryId, fn ($query) => $query->where('archive_category', $this->categoryId))
                 ->when($this->branchOfficeId, fn ($query) => $query->where('archive_branch_office', $this->branchOfficeId))
@@ -182,8 +187,14 @@ class LegacyArchiveLinker extends Page
                 ->latest('created_at')
                 ->limit(50)
                 ->get(),
-            'categories' => Category::query()->orderBy('category_name')->get(),
-            'branches' => BranchOffice::query()->orderBy('branch_code')->get(),
+            'categories' => Category::query()
+                ->whereIn('id', $visibleCategoryIds)
+                ->orderBy('category_name')
+                ->get(),
+            'branches' => BranchOffice::query()
+                ->whereIn('id', $visibleBranchOfficeIds)
+                ->orderBy('branch_code')
+                ->get(),
             'selectedArchive' => $selectedArchive,
             'referenceFields' => $referenceFields,
             'configurationGaps' => $this->configurationGaps(),
@@ -199,7 +210,7 @@ class LegacyArchiveLinker extends Page
             return [];
         }
 
-        $archive = Archive::query()->find($this->selectedArchiveId);
+        $archive = $this->selectedArchiveQuery()->find($this->selectedArchiveId);
 
         if (! $archive) {
             return [];
@@ -226,7 +237,7 @@ class LegacyArchiveLinker extends Page
             return [];
         }
 
-        $archive = Archive::query()->find($this->selectedArchiveId);
+        $archive = $this->selectedArchiveQuery()->find($this->selectedArchiveId);
 
         if (! $archive) {
             return [];
@@ -244,8 +255,10 @@ class LegacyArchiveLinker extends Page
     protected function configurationGaps(): array
     {
         $supportedCategoryNames = array_keys(config('siardi.supported_reconciliation_categories', []));
+        $visibleSupportedCategoryIds = app(ArchiveVisibilityService::class)->visibleSupportedCategoryIds(auth()->user());
 
         return Category::query()
+            ->whereIn('id', $visibleSupportedCategoryIds)
             ->whereIn('category_name', $supportedCategoryNames)
             ->withCount('referenceFields')
             ->orderBy('category_name')
@@ -254,5 +267,21 @@ class LegacyArchiveLinker extends Page
             ->pluck('category_name')
             ->values()
             ->all();
+    }
+
+    protected function scopedArchivesQuery(): Builder
+    {
+        return app(ArchiveVisibilityService::class)->applyArchiveScope(
+            Archive::query()->with(['category', 'branchOffice']),
+            auth()->user(),
+        );
+    }
+
+    protected function selectedArchiveQuery(): Builder
+    {
+        return app(ArchiveVisibilityService::class)->applyArchiveScope(
+            Archive::query()->with(['category', 'branchOffice.dwhMapping']),
+            auth()->user(),
+        );
     }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\Archive;
 use App\Models\BranchOffice;
 use App\Models\Category;
+use App\Services\ArchiveVisibilityService;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
@@ -55,27 +56,44 @@ class RekapanArsip extends Page
      */
     private function buildRecap(): Collection
     {
+        $user = auth()->user();
+        $visibility = app(ArchiveVisibilityService::class);
         $categoryIds = Category::query()
             ->whereIn('category_name', ['TABUNGAN', 'BILYET DEPOSITO', 'KREDIT'])
             ->pluck('id', 'category_name');
 
-        return BranchOffice::query()
-            ->withCount([
-                'archives as tabungan_count' => fn ($query) => $query->where('archive_category', $categoryIds['TABUNGAN'] ?? 0),
-                'archives as deposito_count' => fn ($query) => $query->where('archive_category', $categoryIds['BILYET DEPOSITO'] ?? 0),
-                'archives as kredit_count' => fn ($query) => $query->where('archive_category', $categoryIds['KREDIT'] ?? 0),
-            ])
-            ->whereNotIn('branch_code', ['00', '09'])
+        $counts = $visibility->applyArchiveScope(
+            Archive::query()
+                ->selectRaw('archive_branch_office, archive_category, COUNT(*) as total')
+                ->whereIn('archive_category', $categoryIds->values()->all()),
+            $user,
+        )
+            ->groupBy('archive_branch_office', 'archive_category')
             ->get()
-            ->mapWithKeys(function (BranchOffice $branch): array {
+            ->groupBy('archive_branch_office');
+
+        $branchQuery = BranchOffice::query()
+            ->whereNotIn('branch_code', ['00', '09']);
+
+        if (! $visibility->canViewAllBranches($user)) {
+            $branchQuery->whereIn('id', $visibility->visibleBranchOfficeIds($user));
+        }
+
+        return $branchQuery
+            ->get()
+            ->mapWithKeys(function (BranchOffice $branch) use ($counts, $categoryIds): array {
                 $branchName = $this->formatBranchName($branch->branch_name);
+                $branchCounts = collect($counts->get($branch->id, []))->pluck('total', 'archive_category');
+                $tabunganCount = (int) ($branchCounts[$categoryIds['TABUNGAN'] ?? 0] ?? 0);
+                $depositoCount = (int) ($branchCounts[$categoryIds['BILYET DEPOSITO'] ?? 0] ?? 0);
+                $kreditCount = (int) ($branchCounts[$categoryIds['KREDIT'] ?? 0] ?? 0);
 
                 return [
                     $branchName => [
-                        'tabungan' => (int) $branch->tabungan_count,
-                        'deposito' => (int) $branch->deposito_count,
-                        'kredit' => (int) $branch->kredit_count,
-                        'total' => (int) $branch->tabungan_count + (int) $branch->deposito_count + (int) $branch->kredit_count,
+                        'tabungan' => $tabunganCount,
+                        'deposito' => $depositoCount,
+                        'kredit' => $kreditCount,
+                        'total' => $tabunganCount + $depositoCount + $kreditCount,
                     ],
                 ];
             });

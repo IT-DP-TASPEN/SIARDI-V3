@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\Category;
 use App\Models\DwhBranchMapping;
 use App\Repositories\DwhCoverageRepository;
+use App\Services\ArchiveVisibilityService;
 use Filament\Pages\Page;
 
 class DwhCoverageDashboard extends Page
@@ -13,9 +14,9 @@ class DwhCoverageDashboard extends Page
 
     protected string $view = 'filament.pages.dwh-coverage-dashboard';
 
-    protected static ?string $navigationLabel = 'DWH Coverage';
+    protected static ?string $navigationLabel = 'Target & Realisasi';
 
-    protected static ?string $title = 'DWH Coverage Dashboard';
+    protected static ?string $title = 'Target & Realisasi Arsip';
 
     protected static ?int $navigationSort = 110;
 
@@ -39,6 +40,15 @@ class DwhCoverageDashboard extends Page
 
     public function openDrilldown(int $categoryId, int $branchOfficeId): void
     {
+        $visibility = app(ArchiveVisibilityService::class);
+        $user = auth()->user();
+
+        if (! $visibility->isCategoryVisible($user, $categoryId, true) || ! $visibility->isBranchVisible($user, $branchOfficeId)) {
+            $this->clearDrilldown();
+
+            return;
+        }
+
         $this->drilldownCategoryId = $categoryId;
         $this->drilldownBranchOfficeId = $branchOfficeId;
     }
@@ -52,24 +62,49 @@ class DwhCoverageDashboard extends Page
     protected function getViewData(): array
     {
         $repository = app(DwhCoverageRepository::class);
+        $visibility = app(ArchiveVisibilityService::class);
+        $user = auth()->user();
+        $visibleCategoryIds = $visibility->visibleSupportedCategoryIds($user);
+        $visibleBranchOfficeIds = $visibility->visibleBranchOfficeIds($user);
+        $selectedCategoryInScope = ! $this->selectedCategoryId || $visibility->isCategoryVisible($user, $this->selectedCategoryId, true);
+        $selectedBranchInScope = ! $this->selectedBranchOfficeId || $visibility->isBranchVisible($user, $this->selectedBranchOfficeId);
+
+        $summaryRows = collect();
+
+        if ($selectedCategoryInScope && $selectedBranchInScope) {
+            $summaryRows = $visibility->filterCoverageRows(
+                $repository->getCoverageSummary(
+                    branchOfficeId: $this->selectedBranchOfficeId,
+                    categoryId: $this->selectedCategoryId,
+                ),
+                $user,
+            );
+        }
+
+        $missingRows = collect();
+
+        if (
+            $this->drilldownCategoryId
+            && $this->drilldownBranchOfficeId
+            && $visibility->isCategoryVisible($user, $this->drilldownCategoryId, true)
+            && $visibility->isBranchVisible($user, $this->drilldownBranchOfficeId)
+        ) {
+            $missingRows = $repository->getMissingRecords($this->drilldownCategoryId, $this->drilldownBranchOfficeId);
+        }
 
         return [
             'categories' => Category::query()
-                ->whereIn('category_name', array_keys(config('siardi.supported_reconciliation_categories')))
+                ->whereIn('id', $visibleCategoryIds)
                 ->orderBy('category_name')
                 ->get(),
             'branchMappings' => DwhBranchMapping::query()
                 ->with('branchOffice')
                 ->where('is_active', true)
+                ->whereIn('branch_office_id', $visibleBranchOfficeIds)
                 ->orderBy('siardi_branch_code')
                 ->get(),
-            'summaryRows' => $repository->getCoverageSummary(
-                branchOfficeId: $this->selectedBranchOfficeId,
-                categoryId: $this->selectedCategoryId,
-            ),
-            'missingRows' => $this->drilldownCategoryId && $this->drilldownBranchOfficeId
-                ? $repository->getMissingRecords($this->drilldownCategoryId, $this->drilldownBranchOfficeId)
-                : collect(),
+            'summaryRows' => $summaryRows,
+            'missingRows' => $missingRows,
         ];
     }
 }

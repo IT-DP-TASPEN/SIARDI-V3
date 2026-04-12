@@ -1,12 +1,12 @@
 <x-filament-widgets::widget>
     <x-filament::section
-        heading="Coverage Terendah"
+        heading="Realisasi Terendah"
         description="Cabang dan kategori dengan backlog missing paling besar."
         icon="heroicon-o-fire"
     >
         <x-slot name="afterHeader">
             <x-filament::button color="gray" size="sm" tag="a" :href="$coverageUrl">
-                Full DWH Coverage
+                Buka Detail
             </x-filament::button>
         </x-slot>
 
@@ -15,7 +15,7 @@
                 {{ $overview['message'] }}
             </div>
         @elseif ($rows->isEmpty())
-            <div class="siardi-empty">Belum ada hotspot coverage dalam scope user ini.</div>
+            <div class="siardi-empty">Belum ada hotspot realisasi dalam scope user ini.</div>
         @else
             <div class="siardi-table-shell">
                 <table class="siardi-table">
@@ -24,7 +24,7 @@
                             <th>Kategori</th>
                             <th>Cabang</th>
                             <th class="text-right">Target</th>
-                            <th class="text-right">Realized</th>
+                            <th class="text-right">Realisasi</th>
                             <th class="text-right">Missing</th>
                             <th class="text-right">Coverage</th>
                         </tr>
@@ -42,7 +42,7 @@
                                 <td><x-filament::badge color="gray">{{ $row['category_name'] }}</x-filament::badge></td>
                                 <td>
                                     <div class="font-medium text-gray-950 dark:text-white">{{ $row['branch_name'] }}</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['branch_code'] }} | DWH {{ $row['dwh_location_code'] }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['branch_code'] }} | Kode Target {{ $row['dwh_location_code'] }}</div>
                                 </td>
                                 <td class="text-right">{{ number_format($row['target_count']) }}</td>
                                 <td class="text-right">{{ number_format($row['realized_count']) }}</td>
