@@ -4,10 +4,15 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Pages\DwhCoverageDashboard;
 use App\Services\DashboardSnapshotService;
+use BezhanSalleh\FilamentShield\Traits\HasWidgetShield;
 use Filament\Widgets\Widget;
 
 class CoverageHotspotsTableWidget extends Widget
 {
+    use HasWidgetShield {
+        canView as protected canViewViaShield;
+    }
+
     protected static bool $isLazy = false;
 
     protected string $view = 'filament.widgets.coverage-hotspots-table-widget';
@@ -16,7 +21,7 @@ class CoverageHotspotsTableWidget extends Widget
 
     public static function canView(): bool
     {
-        return (bool) config('siardi.features.dwh_reconciliation');
+        return (bool) config('siardi.features.dwh_reconciliation') && static::canViewViaShield();
     }
 
     /**

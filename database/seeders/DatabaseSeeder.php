@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\BranchOffice;
 use App\Models\Category;
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +20,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $adminBranchOffice = BranchOffice::query()->where('branch_code', '01')->first();
-        $adminRole = Role::query()->where('name', 'super_admin')->first();
 
         $user = User::query()->firstOrCreate(
             ['email' => 'admin@example.com'],
@@ -33,9 +31,7 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        if ($adminRole) {
-            $user->roles()->sync([$adminRole->id]);
-        }
+        $user->syncRoles(['super_admin']);
 
         $user->permittedCategories()->syncWithoutDetaching(Category::query()->pluck('id')->all());
     }

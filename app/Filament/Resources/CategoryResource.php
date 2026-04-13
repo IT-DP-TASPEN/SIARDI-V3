@@ -19,11 +19,6 @@ class CategoryResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-tag';
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return auth()->user()?->isAdmin() ?? false;
-    }
-
     public static function form(Schema $schema): Schema
     {
         return $schema

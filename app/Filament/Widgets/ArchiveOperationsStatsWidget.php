@@ -3,11 +3,14 @@
 namespace App\Filament\Widgets;
 
 use App\Services\DashboardSnapshotService;
+use BezhanSalleh\FilamentShield\Traits\HasWidgetShield;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class ArchiveOperationsStatsWidget extends StatsOverviewWidget
 {
+    use HasWidgetShield;
+
     protected static bool $isLazy = false;
 
     protected int | string | array $columnSpan = 'full';

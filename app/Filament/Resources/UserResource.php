@@ -15,17 +15,13 @@ use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Hash;
+use STS\FilamentImpersonate\Actions\Impersonate;
 
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return auth()->user()?->isAdmin() ?? false;
-    }
 
     public static function form(Schema $schema): Schema
     {
@@ -39,18 +35,18 @@ class UserResource extends Resource
                 Forms\Components\TextInput::make('username')
                     ->required()
                     ->maxLength(255)
-                    ->unique(ignorable: fn (?User $record): ?User => $record),
+                    ->unique(ignorable: fn(?User $record): ?User => $record),
                 Forms\Components\TextInput::make('email')
                     ->email()
                     ->required()
                     ->maxLength(255)
-                    ->unique(ignorable: fn (?User $record): ?User => $record),
+                    ->unique(ignorable: fn(?User $record): ?User => $record),
                 Forms\Components\TextInput::make('password')
                     ->password()
                     ->label('Password')
-                    ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? Hash::make($state) : null)
-                    ->dehydrated(fn (?string $state): bool => filled($state))
-                    ->required(fn (string $operation): bool => $operation === 'create'),
+                    ->dehydrateStateUsing(fn(?string $state): ?string => filled($state) ? Hash::make($state) : null)
+                    ->dehydrated(fn(?string $state): bool => filled($state))
+                    ->required(fn(string $operation): bool => $operation === 'create'),
                 Forms\Components\Select::make('roles')
                     ->relationship('roles', 'name')
                     ->multiple()
@@ -82,7 +78,9 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('branchOffice.branch_name')->label('Cabang')->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->actions([
+            ->recordActions([
+                Impersonate::make()
+                    ->hiddenLabel(),
                 EditAction::make(),
                 Action::make('resetPassword')
                     ->label('Reset Password')

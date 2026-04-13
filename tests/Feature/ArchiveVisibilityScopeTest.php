@@ -6,7 +6,6 @@ use App\Models\Archive;
 use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\DwhBranchMapping;
-use App\Models\Role;
 use App\Models\User;
 use App\Services\ArchiveVisibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,18 +27,14 @@ class ArchiveVisibilityScopeTest extends TestCase
         $this->createRawLoansTable();
     }
 
-    public function test_non_head_office_staff_archive_surfaces_are_scoped_to_own_branch_and_allowed_categories(): void
+    public function test_non_head_office_kearsipan_archive_surfaces_are_scoped_to_own_branch_and_allowed_categories(): void
     {
         [$branchOne, $branchTwo, $tabungan, $audit] = $this->createArchiveScopeFixtures();
-        $staffRole = Role::query()->create([
-            'name' => 'staff',
-            'guard_name' => 'web',
-        ]);
 
         $user = User::factory()->create([
             'branch_office_id' => $branchOne->id,
         ]);
-        $user->roles()->attach($staffRole->id);
+        $this->assignRole($user, 'kearsipan');
         $user->permittedCategories()->attach($tabungan->id);
 
         Archive::query()->create([
@@ -128,15 +123,10 @@ class ArchiveVisibilityScopeTest extends TestCase
             'is_active' => true,
         ]);
 
-        $adminRole = Role::query()->create([
-            'name' => 'super_admin',
-            'guard_name' => 'web',
-        ]);
-
         $user = User::factory()->create([
             'branch_office_id' => $branchOne->id,
         ]);
-        $user->roles()->attach($adminRole->id);
+        $this->assignRole($user, 'super_admin');
         $user->permittedCategories()->attach($tabungan->id);
 
         DB::connection('dwh')->table('raw_savings')->insert([
@@ -153,7 +143,7 @@ class ArchiveVisibilityScopeTest extends TestCase
             ->assertDontSee('DWH');
     }
 
-    public function test_non_head_office_staff_recap_page_and_print_follow_branch_scope(): void
+    public function test_non_head_office_kearsipan_recap_page_and_print_follow_branch_scope(): void
     {
         $kredit = Category::query()->create([
             'category_name' => 'KREDIT',
@@ -175,15 +165,10 @@ class ArchiveVisibilityScopeTest extends TestCase
             'branch_name' => 'KC Bogor',
         ]);
 
-        $staffRole = Role::query()->create([
-            'name' => 'staff',
-            'guard_name' => 'web',
-        ]);
-
         $user = User::factory()->create([
             'branch_office_id' => $branchOne->id,
         ]);
-        $user->roles()->attach($staffRole->id);
+        $this->assignRole($user, 'kearsipan');
         $user->permittedCategories()->attach($kredit->id);
 
         foreach ([
@@ -224,15 +209,10 @@ class ArchiveVisibilityScopeTest extends TestCase
             'branch_name' => 'Kantor Pusat Manajemen',
         ]);
 
-        $adminRole = Role::query()->create([
-            'name' => 'super_admin',
-            'guard_name' => 'web',
-        ]);
-
         $user = User::factory()->create([
             'branch_office_id' => $headOffice->id,
         ]);
-        $user->roles()->attach($adminRole->id);
+        $this->assignRole($user, 'super_admin');
 
         Archive::query()->create([
             'archive_category' => $tabungan->id,

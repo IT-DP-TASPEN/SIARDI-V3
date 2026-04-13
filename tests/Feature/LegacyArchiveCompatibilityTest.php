@@ -153,6 +153,7 @@ class LegacyArchiveCompatibilityTest extends TestCase
             'branch_office_id' => $branch->id,
         ]);
 
+        $this->assignRole($user, 'it_admin');
         $user->permittedCategories()->attach($category->id);
 
         return [$branch, $category, $user];

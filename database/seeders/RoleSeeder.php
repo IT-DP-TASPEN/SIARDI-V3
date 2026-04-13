@@ -2,20 +2,53 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
+use App\Support\RbacPermissionMatrix;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        $roles = [
-            ['name' => 'super_admin', 'guard_name' => 'web'],
-            ['name' => 'staff', 'guard_name' => 'web'],
-            ['name' => 'it', 'guard_name' => 'web'],
-            ['name' => 'user', 'guard_name' => 'web'],
-        ];
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        DB::table('roles')->upsert($roles, ['name', 'guard_name'], []);
+        Permission::query()->upsert(
+            collect(RbacPermissionMatrix::allPermissions())
+                ->map(fn (string $permission): array => [
+                    'name' => $permission,
+                    'guard_name' => 'web',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+                ->all(),
+            ['name', 'guard_name'],
+            ['updated_at'],
+        );
+
+        Role::query()->upsert(
+            collect(RbacPermissionMatrix::roles())
+                ->map(fn (string $role): array => [
+                    'name' => $role,
+                    'guard_name' => 'web',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+                ->all(),
+            ['name', 'guard_name'],
+            ['updated_at'],
+        );
+
+        foreach (RbacPermissionMatrix::rolePermissions() as $roleName => $permissions) {
+            $role = Role::query()
+                ->where('name', $roleName)
+                ->where('guard_name', 'web')
+                ->firstOrFail();
+
+            $role->syncPermissions($permissions);
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

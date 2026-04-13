@@ -7,12 +7,15 @@ use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Services\ArchiveVisibilityService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 class RekapArsipController extends Controller
 {
     public function print()
     {
+        Gate::authorize('page_RekapanArsip');
+
         $user = auth()->user();
         $visibility = app(ArchiveVisibilityService::class);
         $categoryIds = Category::query()

@@ -6,6 +6,7 @@ use App\Models\Archive;
 use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Services\ArchiveVisibilityService;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
 
 class RekapanArsip extends Page
 {
+    use HasPageShield;
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-presentation-chart-line';
 
     public static ?string $slug = 'archive-recap';
@@ -26,11 +29,6 @@ class RekapanArsip extends Page
     protected string $view = 'filament.pages.rekapan-arsip';
 
     protected static ?int $navigationSort = 100;
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return true;
-    }
 
     protected function getHeaderActions(): array
     {

@@ -3,11 +3,16 @@
 namespace App\Filament\Widgets;
 
 use App\Services\DashboardSnapshotService;
+use BezhanSalleh\FilamentShield\Traits\HasWidgetShield;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class DwhCoverageStatsWidget extends StatsOverviewWidget
 {
+    use HasWidgetShield {
+        canView as protected canViewViaShield;
+    }
+
     protected static bool $isLazy = false;
 
     protected int | string | array $columnSpan = 'full';
@@ -18,7 +23,7 @@ class DwhCoverageStatsWidget extends StatsOverviewWidget
 
     public static function canView(): bool
     {
-        return (bool) config('siardi.features.dwh_reconciliation');
+        return (bool) config('siardi.features.dwh_reconciliation') && static::canViewViaShield();
     }
 
     /**

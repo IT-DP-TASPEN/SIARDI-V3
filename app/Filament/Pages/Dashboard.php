@@ -52,13 +52,14 @@ class Dashboard extends BaseDashboard
                 ->label('Archive Recap')
                 ->color('gray')
                 ->icon('heroicon-o-presentation-chart-line')
-                ->url(RekapanArsip::getUrl()),
+                ->url(RekapanArsip::getUrl())
+                ->visible(fn (): bool => RekapanArsip::canAccess()),
             Action::make('dwhCoverage')
                 ->label('Target & Realisasi')
                 ->color('primary')
                 ->icon('heroicon-o-chart-bar-square')
                 ->url(DwhCoverageDashboard::getUrl())
-                ->visible(fn(): bool => (bool) config('siardi.features.dwh_reconciliation')),
+                ->visible(fn (): bool => DwhCoverageDashboard::canAccess()),
             Action::make('legacyLinking')
                 ->label('Legacy Linking')
                 ->color('gray')

@@ -19,11 +19,6 @@ class BranchOfficeResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-building-office';
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return auth()->user()?->isAdmin() ?? false;
-    }
-
     public static function form(Schema $schema): Schema
     {
         return $schema

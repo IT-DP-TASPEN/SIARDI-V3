@@ -9,7 +9,6 @@ return [
 
     'admin_roles' => [
         'super_admin',
-        'staff',
     ],
 
     'supported_reconciliation_categories' => [

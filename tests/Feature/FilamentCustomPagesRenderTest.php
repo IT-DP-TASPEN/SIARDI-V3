@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\DwhBranchMapping;
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -119,11 +118,6 @@ class FilamentCustomPagesRenderTest extends TestCase
             'branch_name' => 'Kantor Pusat Manajemen',
         ]);
 
-        $role = Role::query()->create([
-            'name' => 'super_admin',
-            'guard_name' => 'web',
-        ]);
-
         $user = User::query()->create([
             'name' => 'Admin User',
             'email' => 'admin-render@example.com',
@@ -132,7 +126,7 @@ class FilamentCustomPagesRenderTest extends TestCase
             'branch_office_id' => $branch->id,
         ]);
 
-        $user->roles()->attach($role->id);
+        $this->assignRole($user, 'super_admin');
 
         return $user;
     }

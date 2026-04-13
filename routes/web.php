@@ -7,4 +7,6 @@ Route::get('/', function () {
     return redirect('/arsip_digital');
 });
 
-Route::get('/arsip_digital/archive-recap/print', [RekapArsipController::class, 'print'])->name('rekap.print');
+Route::middleware(['auth', 'can:page_RekapanArsip'])
+    ->get('/arsip_digital/archive-recap/print', [RekapArsipController::class, 'print'])
+    ->name('rekap.print');

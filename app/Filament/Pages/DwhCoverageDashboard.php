@@ -6,10 +6,15 @@ use App\Models\Category;
 use App\Models\DwhBranchMapping;
 use App\Repositories\DwhCoverageRepository;
 use App\Services\ArchiveVisibilityService;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Pages\Page;
 
 class DwhCoverageDashboard extends Page
 {
+    use HasPageShield {
+        canAccess as protected canAccessViaShield;
+    }
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar-square';
 
     protected string $view = 'filament.pages.dwh-coverage-dashboard';
@@ -30,12 +35,12 @@ class DwhCoverageDashboard extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return (bool) config('siardi.features.dwh_reconciliation');
+        return static::canAccess() && parent::shouldRegisterNavigation();
     }
 
     public static function canAccess(): bool
     {
-        return (bool) config('siardi.features.dwh_reconciliation');
+        return (bool) config('siardi.features.dwh_reconciliation') && static::canAccessViaShield();
     }
 
     public function openDrilldown(int $categoryId, int $branchOfficeId): void

@@ -7,6 +7,7 @@ use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Services\ArchiveBusinessReferenceService;
 use App\Services\ArchiveVisibilityService;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,6 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 class LegacyArchiveLinker extends Page
 {
+    use HasPageShield {
+        canAccess as protected canAccessViaShield;
+    }
+
     public const LINKING_MODAL_ID = 'legacy-linking-modal';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-link';
@@ -62,12 +67,12 @@ class LegacyArchiveLinker extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return static::hasLegacyLinkingAccess(auth()->user());
+        return static::canAccess() && parent::shouldRegisterNavigation();
     }
 
     public static function canAccess(): bool
     {
-        return static::hasLegacyLinkingAccess(auth()->user());
+        return static::canAccessViaShield() && static::hasLegacyLinkingAccess(auth()->user());
     }
 
     public function selectArchive(int $archiveId): void

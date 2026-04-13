@@ -3,11 +3,14 @@
 namespace App\Filament\Widgets;
 
 use App\Services\DashboardSnapshotService;
+use BezhanSalleh\FilamentShield\Traits\HasWidgetShield;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 
 class ArchiveUploadsTrendWidget extends ChartWidget
 {
+    use HasWidgetShield;
+
     protected static bool $isLazy = false;
 
     protected int | string | array $columnSpan = 'full';

@@ -69,6 +69,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $user = User::factory()->create([
             'branch_office_id' => $branch->id,
         ]);
+        $this->assignRole($user, 'kearsipan');
         $user->permittedCategories()->attach($category->id);
 
         DwhBranchMapping::query()->create([
@@ -145,6 +146,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $user = User::factory()->create([
             'branch_office_id' => $branch->id,
         ]);
+        $this->assignRole($user, 'kearsipan');
         $user->permittedCategories()->attach($category->id);
 
         $this->actingAs($user)
@@ -167,6 +169,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $user = User::factory()->create([
             'branch_office_id' => $branch->id,
         ]);
+        $this->assignRole($user, 'kearsipan');
 
         $this->actingAs($user)
             ->get('/arsip_digital/legacy-archive-linker')
@@ -193,6 +196,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $user = User::factory()->create([
             'branch_office_id' => $branchOne->id,
         ]);
+        $this->assignRole($user, 'kearsipan');
         $user->permittedCategories()->attach($category->id);
 
         $archive = Archive::query()->create([
@@ -299,6 +303,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $user = User::factory()->create([
             'branch_office_id' => $branch->id,
         ]);
+        $this->assignRole($user, 'kearsipan');
         $user->permittedCategories()->attach($category->id);
 
         DwhBranchMapping::query()->create([
@@ -386,6 +391,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $user = User::factory()->create([
             'branch_office_id' => $branch->id,
         ]);
+        $this->assignRole($user, 'kearsipan');
         $user->permittedCategories()->attach($category->id);
 
         $mapping = DwhBranchMapping::query()->create([

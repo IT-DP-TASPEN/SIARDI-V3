@@ -8,7 +8,6 @@ use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\CategoryReferenceField;
 use App\Models\DwhBranchMapping;
-use App\Models\Role;
 use App\Models\User;
 use App\Services\DashboardSnapshotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -178,15 +177,10 @@ class DashboardSnapshotServiceTest extends TestCase
             'is_active' => true,
         ]);
 
-        $adminRole = Role::query()->create([
-            'name' => 'super_admin',
-            'guard_name' => 'web',
-        ]);
-
         $admin = User::factory()->create([
             'branch_office_id' => $headOffice->id,
         ]);
-        $admin->roles()->attach($adminRole->id);
+        $this->assignRole($admin, 'super_admin');
 
         DB::connection('dwh')->table('raw_savings')->insert([
             ['_row_key' => 'A1', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000001', 'norekening' => '001000000000001', 'status_dokumen' => 'Active'],
