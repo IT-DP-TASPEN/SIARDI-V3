@@ -132,10 +132,20 @@ class ArchiveResource extends Resource
                     ->label('Nama Arsip')
                     ->searchable()
                     ->limit(40),
+                Tables\Columns\TextColumn::make('cif')
+                    ->label('CIF')
+                    ->state(fn (Archive $record): string => static::businessReferenceValue($record, 'cif'))
+                    ->searchable(
+                        query: fn (Builder $query, string $search): Builder => static::applyBusinessReferenceSearch($query, 'cif', $search),
+                    ),
                 Tables\Columns\TextColumn::make('primary_reference')
                     ->label('Referensi Utama')
                     ->state(fn(Archive $record): string => static::primaryReferenceValue($record))
                     ->searchable(false),
+                Tables\Columns\TextColumn::make('archive_description')
+                    ->label('Deskripsi')
+                    ->limit(50)
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('linkage_status')
                     ->label('Status Linkage')
                     ->state(fn(Archive $record): string => static::archiveLinkageStatus($record)['label'])
@@ -196,7 +206,7 @@ class ArchiveResource extends Resource
                     ->icon('heroicon-o-arrow-path')
                     ->color('gray')
                     ->requiresConfirmation()
-                    ->visible(fn (Archive $record): bool => app(ArchiveBusinessReferenceService::class)->visibleBusinessReferences($record)->isNotEmpty())
+                    ->visible(fn(Archive $record): bool => app(ArchiveBusinessReferenceService::class)->visibleBusinessReferences($record)->isNotEmpty())
                     ->action(function (Archive $record): void {
                         RematchArchiveReferencesJob::dispatch($record->getKey());
 
@@ -382,6 +392,39 @@ class ArchiveResource extends Resource
             ->first(fn($reference) => (bool) $reference->categoryReferenceField?->is_primary_match_key);
 
         return $primaryReference?->raw_value ?: '-';
+    }
+
+    private static function businessReferenceValue(Archive $record, string $referenceType): string
+    {
+        $record->loadMissing('businessReferences');
+
+        $reference = $record->businessReferences
+            ->firstWhere('reference_type', $referenceType);
+
+        return $reference?->raw_value ?: ($reference?->normalized_value ?: '-');
+    }
+
+    private static function applyBusinessReferenceSearch(Builder $query, string $referenceType, string $search): Builder
+    {
+        $search = trim($search);
+
+        if ($search === '') {
+            return $query;
+        }
+
+        $normalized = ReferenceNormalizer::normalize($search);
+
+        return $query->whereHas('businessReferences', function (Builder $referenceQuery) use ($normalized, $referenceType, $search): void {
+            $referenceQuery
+                ->where('reference_type', $referenceType)
+                ->where(function (Builder $valueQuery) use ($normalized, $search): void {
+                    $valueQuery->where('raw_value', 'like', "%{$search}%");
+
+                    if (filled($normalized)) {
+                        $valueQuery->orWhere('normalized_value', 'like', "%{$normalized}%");
+                    }
+                });
+        });
     }
 
     private static function renderBusinessReferenceHtml(Archive $record): HtmlString
