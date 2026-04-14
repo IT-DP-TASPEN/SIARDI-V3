@@ -91,7 +91,7 @@ class ArchiveVisibilityService
             return false;
         }
 
-        return $user->isAdmin() || $user->hasRole(['staff', 'it']);
+        return $user->isAdmin() || $user->hasRole(['staff', 'kearsipan', 'it']);
     }
 
     public function canViewAllArchives(?User $user): bool
