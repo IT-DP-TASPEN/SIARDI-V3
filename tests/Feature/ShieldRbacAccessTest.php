@@ -73,6 +73,10 @@ class ShieldRbacAccessTest extends TestCase
             ->assertOk();
 
         $this->actingAs($user)
+            ->get('/arsip_digital/legacy-inactive-archives')
+            ->assertOk();
+
+        $this->actingAs($user)
             ->get("/arsip_digital/archives/{$archive->id}/edit")
             ->assertOk();
     }
@@ -104,6 +108,10 @@ class ShieldRbacAccessTest extends TestCase
         $this->actingAs($user)
             ->get('/arsip_digital/legacy-archive-linker')
             ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get('/arsip_digital/legacy-inactive-archives')
+            ->assertForbidden();
     }
 
     public function test_it_admin_can_edit_archives_and_open_legacy_linker_but_cannot_access_recap_or_coverage(): void
@@ -117,6 +125,10 @@ class ShieldRbacAccessTest extends TestCase
 
         $this->actingAs($user)
             ->get('/arsip_digital/legacy-archive-linker')
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->get('/arsip_digital/legacy-inactive-archives')
             ->assertOk();
 
         $this->actingAs($user)
@@ -146,6 +158,10 @@ class ShieldRbacAccessTest extends TestCase
 
         $this->actingAs($user)
             ->get('/arsip_digital/legacy-archive-linker')
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get('/arsip_digital/legacy-inactive-archives')
             ->assertForbidden();
     }
 

@@ -3,15 +3,19 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\LegacyArchiveLinker;
+use App\Filament\Pages\LegacyInactiveArchives;
 use App\Models\Archive;
 use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\CategoryReferenceField;
 use App\Models\DwhBranchMapping;
+use App\Models\LegacyArchiveInactive;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\Concerns\InteractsWithDwh;
 use Tests\TestCase;
@@ -347,6 +351,176 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertSet('candidateResults.0.source_key', 'LOAN-ALT-1')
             ->call('applyCandidate', 0)
             ->assertSet("referenceInputs.{$primaryField->id}", '1234567890123456');
+    }
+
+    public function test_linking_modal_shows_text_preview_for_supported_files(): void
+    {
+        Storage::fake('public');
+
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'KC Karawang',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+        $this->assignRole($user, 'kearsipan');
+        $user->permittedCategories()->attach($category->id);
+
+        Storage::disk('public')->put('archives/preview.txt', 'Isi preview legacy');
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Legacy Text Preview',
+            'archive_code' => 'TXT-001',
+            'archive_description' => 'Preview file',
+            'archive_path' => 'archives/preview.txt',
+            'archive_type' => 'txt',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(LegacyArchiveLinker::class)
+            ->call('selectArchive', $archive->id)
+            ->assertSee('Preview Arsip')
+            ->assertSee('Isi preview legacy');
+    }
+
+    public function test_mark_inactive_moves_archive_to_inactive_page(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'KC Karawang',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+        $this->assignRole($user, 'kearsipan');
+        $user->permittedCategories()->attach($category->id);
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Legacy Inactive Target',
+            'archive_code' => 'INA-001',
+            'archive_description' => 'Archive',
+            'archive_path' => 'archives/inactive-target.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(LegacyArchiveLinker::class)
+            ->call('selectArchive', $archive->id)
+            ->call('markInactive')
+            ->assertDispatched('close-modal', id: LegacyArchiveLinker::LINKING_MODAL_ID)
+            ->assertSet('selectedArchiveId', null);
+
+        $this->assertDatabaseHas('legacy_archive_inactives', [
+            'archive_id' => $archive->id,
+            'marked_inactive_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(LegacyArchiveLinker::getUrl())
+            ->assertOk()
+            ->assertDontSee('Legacy Inactive Target');
+
+        $this->actingAs($user)
+            ->get(LegacyInactiveArchives::getUrl())
+            ->assertOk()
+            ->assertSee('Legacy Inactive Target');
+    }
+
+    public function test_legacy_linking_page_paginates_results_and_excludes_inactive_archives(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'KC Karawang',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+        $this->assignRole($user, 'kearsipan');
+        $user->permittedCategories()->attach($category->id);
+
+        foreach (range(1, 51) as $index) {
+            $archive = Archive::query()->create([
+                'archive_category' => $category->id,
+                'archive_user' => $user->id,
+                'archive_name' => sprintf('Queue %02d', $index),
+                'archive_code' => sprintf('Q-%02d', $index),
+                'archive_description' => 'Archive',
+                'archive_path' => sprintf('archives/queue-%02d.pdf', $index),
+                'archive_type' => 'pdf',
+                'archive_branch_office' => $branch->id,
+                'archive_date' => '2026-04-12',
+            ]);
+
+            $timestamp = Carbon::parse('2026-04-12 08:00:00')->addMinutes($index);
+            $archive->forceFill([
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ])->saveQuietly();
+        }
+
+        $inactiveArchive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Queue Inactive',
+            'archive_code' => 'Q-INACTIVE',
+            'archive_description' => 'Archive',
+            'archive_path' => 'archives/queue-inactive.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        $inactiveArchive->forceFill([
+            'created_at' => Carbon::parse('2026-04-12 10:00:00'),
+            'updated_at' => Carbon::parse('2026-04-12 10:00:00'),
+        ])->saveQuietly();
+
+        LegacyArchiveInactive::query()->create([
+            'archive_id' => $inactiveArchive->id,
+            'marked_inactive_by' => $user->id,
+            'marked_inactive_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(LegacyArchiveLinker::getUrl())
+            ->assertOk()
+            ->assertSee('Queue 51')
+            ->assertDontSee('Queue 01')
+            ->assertDontSee('Queue Inactive');
+
+        $this->actingAs($user)
+            ->get(LegacyArchiveLinker::getUrl().'?page=2')
+            ->assertOk()
+            ->assertSee('Queue 01')
+            ->assertDontSee('Queue 02')
+            ->assertDontSee('Queue Inactive');
     }
 
     /**

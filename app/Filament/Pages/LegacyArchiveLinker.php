@@ -7,17 +7,20 @@ use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Services\ArchiveBusinessReferenceService;
 use App\Services\ArchiveVisibilityService;
+use App\Support\ArchivePreviewRenderer;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
+use Livewire\WithPagination;
 
 class LegacyArchiveLinker extends Page
 {
     use HasPageShield {
         canAccess as protected canAccessViaShield;
     }
+    use WithPagination;
 
     public const LINKING_MODAL_ID = 'legacy-linking-modal';
 
@@ -30,6 +33,8 @@ class LegacyArchiveLinker extends Page
     protected static ?string $title = 'Legacy Archive Linking';
 
     protected static ?int $navigationSort = 120;
+
+    protected int $perPage = 50;
 
     public ?string $search = null;
 
@@ -75,6 +80,31 @@ class LegacyArchiveLinker extends Page
         return static::canAccessViaShield() && static::hasLegacyLinkingAccess(auth()->user());
     }
 
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedCategoryId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedBranchOfficeId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedUploadedFrom(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedUploadedTo(): void
+    {
+        $this->resetPage();
+    }
+
     public function selectArchive(int $archiveId): void
     {
         $archive = $this->selectedArchiveQuery()->findOrFail($archiveId);
@@ -94,6 +124,31 @@ class LegacyArchiveLinker extends Page
 
         $this->selectedArchiveId = $archiveId;
         $this->dispatch('open-modal', id: self::LINKING_MODAL_ID);
+    }
+
+    public function markInactive(): void
+    {
+        if (! $this->selectedArchiveId) {
+            return;
+        }
+
+        $archive = $this->selectedArchiveQuery()->findOrFail($this->selectedArchiveId);
+
+        $archive->legacyInactiveMarker()->updateOrCreate(
+            ['archive_id' => $archive->id],
+            [
+                'marked_inactive_by' => auth()->id(),
+                'marked_inactive_at' => now(),
+            ],
+        );
+
+        Notification::make()
+            ->title('Arsip ditandai inactive')
+            ->success()
+            ->send();
+
+        $this->resetSelectionState();
+        $this->dispatch('close-modal', id: self::LINKING_MODAL_ID);
     }
 
     public function clearSelection(): void
@@ -210,25 +265,7 @@ class LegacyArchiveLinker extends Page
             : collect();
 
         return [
-            'archives' => $this->scopedArchivesQuery()
-                ->whereDoesntHave('businessReferences', function (Builder $query): void {
-                    $query->whereNotIn('reference_type', app(ArchiveBusinessReferenceService::class)->deprecatedReferenceTypes());
-                })
-                ->when($this->categoryId, fn ($query) => $query->where('archive_category', $this->categoryId))
-                ->when($this->branchOfficeId, fn ($query) => $query->where('archive_branch_office', $this->branchOfficeId))
-                ->when($this->uploadedFrom, fn ($query) => $query->whereDate('created_at', '>=', $this->uploadedFrom))
-                ->when($this->uploadedTo, fn ($query) => $query->whereDate('created_at', '<=', $this->uploadedTo))
-                ->when($this->search, function ($query): void {
-                    $query->where(function ($innerQuery): void {
-                        $innerQuery
-                            ->where('archive_name', 'like', '%'.$this->search.'%')
-                            ->orWhere('archive_code', 'like', '%'.$this->search.'%')
-                            ->orWhere('archive_path', 'like', '%'.$this->search.'%');
-                    });
-                })
-                ->latest('created_at')
-                ->limit(50)
-                ->get(),
+            'archives' => $this->filteredArchivesQuery()->paginate($this->perPage),
             'categories' => Category::query()
                 ->whereIn('id', $visibleCategoryIds)
                 ->orderBy('category_name')
@@ -240,6 +277,7 @@ class LegacyArchiveLinker extends Page
             'selectedArchive' => $selectedArchive,
             'referenceFields' => $referenceFields,
             'configurationGaps' => $this->configurationGaps(),
+            'archivePreviewHtml' => $selectedArchive ? ArchivePreviewRenderer::render($selectedArchive, '60vh') : null,
         ];
     }
 
@@ -311,18 +349,43 @@ class LegacyArchiveLinker extends Page
             ->all();
     }
 
-    protected function scopedArchivesQuery(): Builder
+    protected function filteredArchivesQuery(): Builder
     {
-        return app(ArchiveVisibilityService::class)->applyArchiveScope(
-            Archive::query()->with(['category', 'branchOffice']),
-            auth()->user(),
-        );
+        return $this->queueArchivesQuery()
+            ->when($this->categoryId, fn (Builder $query) => $query->where('archive_category', $this->categoryId))
+            ->when($this->branchOfficeId, fn (Builder $query) => $query->where('archive_branch_office', $this->branchOfficeId))
+            ->when($this->uploadedFrom, fn (Builder $query) => $query->whereDate('created_at', '>=', $this->uploadedFrom))
+            ->when($this->uploadedTo, fn (Builder $query) => $query->whereDate('created_at', '<=', $this->uploadedTo))
+            ->when($this->search, function (Builder $query): void {
+                $query->where(function (Builder $innerQuery): void {
+                    $innerQuery
+                        ->where('archive_name', 'like', '%'.$this->search.'%')
+                        ->orWhere('archive_code', 'like', '%'.$this->search.'%')
+                        ->orWhere('archive_path', 'like', '%'.$this->search.'%');
+                });
+            })
+            ->latest('created_at');
+    }
+
+    protected function queueArchivesQuery(): Builder
+    {
+        return $this->scopedArchivesQuery(['category', 'branchOffice'])
+            ->whereDoesntHave('legacyInactiveMarker')
+            ->whereDoesntHave('businessReferences', function (Builder $query): void {
+                $query->whereNotIn('reference_type', app(ArchiveBusinessReferenceService::class)->deprecatedReferenceTypes());
+            });
     }
 
     protected function selectedArchiveQuery(): Builder
     {
+        return $this->scopedArchivesQuery(['category', 'branchOffice.dwhMapping', 'legacyInactiveMarker'])
+            ->whereDoesntHave('legacyInactiveMarker');
+    }
+
+    protected function scopedArchivesQuery(array $relations): Builder
+    {
         return app(ArchiveVisibilityService::class)->applyArchiveScope(
-            Archive::query()->with(['category', 'branchOffice.dwhMapping']),
+            Archive::query()->with($relations),
             auth()->user(),
         );
     }

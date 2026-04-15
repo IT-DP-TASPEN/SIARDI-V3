@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Archive extends Model
 {
@@ -40,5 +41,10 @@ class Archive extends Model
     public function branchOffice(): BelongsTo
     {
         return $this->belongsTo(BranchOffice::class, 'archive_branch_office');
+    }
+
+    public function legacyInactiveMarker(): HasOne
+    {
+        return $this->hasOne(LegacyArchiveInactive::class);
     }
 }

@@ -87,6 +87,7 @@ class RbacPermissionMatrix
                 'page_RekapanArsip',
                 'page_DwhCoverageDashboard',
                 'page_LegacyArchiveLinker',
+                'page_LegacyInactiveArchives',
                 'widget_ArchiveOperationsStatsWidget',
                 'widget_ArchiveUploadsTrendWidget',
                 'widget_RecentArchivesTableWidget',
@@ -122,6 +123,7 @@ class RbacPermissionMatrix
                 ...$archiveCreator,
                 'update_archive',
                 'page_LegacyArchiveLinker',
+                'page_LegacyInactiveArchives',
             ],
             'hc' => [
                 ...$archiveCreator,
@@ -225,6 +227,7 @@ class RbacPermissionMatrix
             'page_RekapanArsip',
             'page_DwhCoverageDashboard',
             'page_LegacyArchiveLinker',
+            'page_LegacyInactiveArchives',
         ];
     }
 

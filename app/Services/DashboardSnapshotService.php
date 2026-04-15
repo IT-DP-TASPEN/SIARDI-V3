@@ -7,6 +7,7 @@ use App\Models\Archive;
 use App\Models\Category;
 use App\Models\User;
 use App\Repositories\DwhCoverageRepository;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -36,6 +37,7 @@ class DashboardSnapshotService
                 ->count(),
             'unlinked_supported_archives' => (clone $query)
                 ->whereIn('archive_category', $supportedCategoryIds)
+                ->whereDoesntHave('legacyInactiveMarker')
                 ->whereDoesntHave('businessReferences', function ($referenceQuery): void {
                     $referenceQuery->whereNotIn(
                         'reference_type',
@@ -56,7 +58,7 @@ class DashboardSnapshotService
 
         $counts = (clone $this->visibleArchivesQuery($user))
             ->whereDate('created_at', '>=', $startDate->toDateString())
-            ->selectRaw("DATE(created_at) as upload_date, COUNT(*) as total")
+            ->selectRaw('DATE(created_at) as upload_date, COUNT(*) as total')
             ->groupBy(DB::raw('DATE(created_at)'))
             ->orderBy('upload_date')
             ->pluck('total', 'upload_date');
@@ -88,6 +90,7 @@ class DashboardSnapshotService
                 'category',
                 'branchOffice',
                 'businessReferences.categoryReferenceField',
+                'legacyInactiveMarker',
             ])
             ->latest('created_at')
             ->limit($limit)
@@ -167,10 +170,10 @@ class DashboardSnapshotService
         }
     }
 
-    private function visibleArchivesQuery(User $user): \Illuminate\Database\Eloquent\Builder
+    private function visibleArchivesQuery(User $user): Builder
     {
         return $this->archiveVisibilityService->applyArchiveScope(
-            Archive::query()->with(['category', 'branchOffice']),
+            Archive::query()->with(['category', 'branchOffice', 'legacyInactiveMarker']),
             $user,
         );
     }

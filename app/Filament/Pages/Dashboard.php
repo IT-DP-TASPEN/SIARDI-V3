@@ -37,7 +37,7 @@ class Dashboard extends BaseDashboard
     /**
      * @return int | array<string, int>
      */
-    public function getColumns(): int | array
+    public function getColumns(): int|array
     {
         return [
             'default' => 1,
@@ -66,6 +66,12 @@ class Dashboard extends BaseDashboard
                 ->icon('heroicon-o-link')
                 ->url(LegacyArchiveLinker::getUrl())
                 ->visible(fn (): bool => LegacyArchiveLinker::canAccess()),
+            Action::make('inactiveArchives')
+                ->label('Arsip Inactive')
+                ->color('gray')
+                ->icon('heroicon-o-archive-box')
+                ->url(LegacyInactiveArchives::getUrl())
+                ->visible(fn (): bool => LegacyInactiveArchives::canAccess()),
         ];
     }
 }

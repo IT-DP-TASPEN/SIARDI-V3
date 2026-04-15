@@ -111,6 +111,23 @@ class FilamentCustomPagesRenderTest extends TestCase
             ->assertDontSee('legacy-linking-workspace', false);
     }
 
+    public function test_legacy_inactive_page_renders_with_empty_state(): void
+    {
+        $user = $this->createAdminUser();
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+        $user->permittedCategories()->attach($category->id);
+
+        $this->actingAs($user)
+            ->get('/arsip_digital/legacy-inactive-archives')
+            ->assertOk()
+            ->assertSee('Filter Arsip Inactive')
+            ->assertSee('Belum ada arsip inactive.')
+            ->assertDontSee('DWH');
+    }
+
     private function createAdminUser(): User
     {
         $branch = BranchOffice::query()->create([

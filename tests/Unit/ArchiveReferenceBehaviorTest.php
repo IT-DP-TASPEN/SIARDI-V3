@@ -7,6 +7,7 @@ use App\Models\Archive;
 use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\CategoryReferenceField;
+use App\Models\LegacyArchiveInactive;
 use App\Models\User;
 use App\Services\ArchiveBusinessReferenceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -215,5 +216,44 @@ class ArchiveReferenceBehaviorTest extends TestCase
 
         $this->assertSame('Konfigurasi Belum Aktif', $status['label']);
         $this->assertSame('warning', $status['color']);
+    }
+
+    public function test_linkage_status_reports_inactive_when_archive_has_inactive_marker(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'Kantor Pusat Operasional',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Archive Inactive',
+            'archive_description' => 'Archive',
+            'archive_path' => 'archives/archive-inactive.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-10',
+        ]);
+
+        LegacyArchiveInactive::query()->create([
+            'archive_id' => $archive->id,
+            'marked_inactive_by' => $user->id,
+            'marked_inactive_at' => now(),
+        ]);
+
+        $status = app(ArchiveBusinessReferenceService::class)->getLinkageStatus($archive->fresh());
+
+        $this->assertSame('Inactive', $status['label']);
+        $this->assertSame('gray', $status['color']);
     }
 }

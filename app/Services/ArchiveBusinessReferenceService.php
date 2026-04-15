@@ -374,8 +374,17 @@ class ArchiveBusinessReferenceService
      */
     public function getLinkageStatus(Archive $archive): array
     {
-        $archive->loadMissing(['category', 'businessReferences.categoryReferenceField']);
+        $archive->loadMissing(['category', 'businessReferences.categoryReferenceField', 'legacyInactiveMarker']);
         $visibleReferences = $this->visibleBusinessReferences($archive);
+
+        if ($archive->legacyInactiveMarker) {
+            return [
+                'label' => 'Inactive',
+                'color' => 'gray',
+                'tone' => 'info',
+                'description' => 'Arsip sudah ditandai inactive dari flow legacy linking.',
+            ];
+        }
 
         if (! config('siardi.features.business_references')) {
             return [
