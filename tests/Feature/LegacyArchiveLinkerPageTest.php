@@ -395,7 +395,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertSee('Isi preview legacy')
             ->assertSee('items-start', false)
             ->assertSee('gap-y-8', false)
-            ->assertSee(route('archive.preview', ['archive' => $archive->id]), false);
+            ->assertSee('/storage/archives/preview.txt', false);
     }
 
     public function test_mark_inactive_moves_archive_to_inactive_page(): void
@@ -529,7 +529,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertDontSee('Queue Inactive');
     }
 
-    public function test_preview_renderer_uses_inline_route_for_previewable_files_and_storage_url_for_others(): void
+    public function test_preview_renderer_uses_storage_url_for_previewable_files_and_others(): void
     {
         Storage::fake('public');
 
@@ -577,8 +577,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $pdfHtml = ArchivePreviewRenderer::render($pdfArchive)->toHtml();
         $docHtml = ArchivePreviewRenderer::render($docArchive)->toHtml();
 
-        $this->assertStringContainsString(route('archive.preview', ['archive' => $pdfArchive->id]), $pdfHtml);
-        $this->assertStringNotContainsString('/storage/archives/preview.pdf', $pdfHtml);
+        $this->assertStringContainsString('/storage/archives/preview.pdf', $pdfHtml);
         $this->assertStringContainsString('/storage/archives/preview.docx', $docHtml);
     }
 

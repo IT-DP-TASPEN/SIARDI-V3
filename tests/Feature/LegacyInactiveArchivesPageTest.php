@@ -77,7 +77,7 @@ class LegacyInactiveArchivesPageTest extends TestCase
             ->assertSee('Isi preview inactive')
             ->assertSee('items-start', false)
             ->assertSee('gap-y-8', false)
-            ->assertSee(route('archive.preview', ['archive' => $archive->id]), false);
+            ->assertSee('/storage/archives/inactive-preview.txt', false);
     }
 
     public function test_inactive_page_uses_filament_pagination_for_multiple_results(): void
