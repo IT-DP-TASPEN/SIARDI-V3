@@ -11,6 +11,7 @@ use App\Models\CategoryReferenceField;
 use App\Models\DwhBranchMapping;
 use App\Models\LegacyArchiveInactive;
 use App\Models\User;
+use App\Support\ArchivePreviewRenderer;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -391,7 +392,10 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->test(LegacyArchiveLinker::class)
             ->call('selectArchive', $archive->id)
             ->assertSee('Preview Arsip')
-            ->assertSee('Isi preview legacy');
+            ->assertSee('Isi preview legacy')
+            ->assertSee('items-start', false)
+            ->assertSee('gap-y-8', false)
+            ->assertSee(route('archive.preview', ['archive' => $archive->id]), false);
     }
 
     public function test_mark_inactive_moves_archive_to_inactive_page(): void
@@ -521,6 +525,59 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertSee('Queue 01')
             ->assertDontSee('Queue 02')
             ->assertDontSee('Queue Inactive');
+    }
+
+    public function test_preview_renderer_uses_inline_route_for_previewable_files_and_storage_url_for_others(): void
+    {
+        Storage::fake('public');
+
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'KC Karawang',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+
+        $pdfArchive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Preview PDF',
+            'archive_code' => 'PDF-001',
+            'archive_description' => 'Archive',
+            'archive_path' => 'archives/preview.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        $docArchive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Preview DOCX',
+            'archive_code' => 'DOCX-001',
+            'archive_description' => 'Archive',
+            'archive_path' => 'archives/preview.docx',
+            'archive_type' => 'docx',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        Storage::disk('public')->put($pdfArchive->archive_path, '%PDF-1.4 preview');
+        Storage::disk('public')->put($docArchive->archive_path, 'docx binary');
+
+        $pdfHtml = ArchivePreviewRenderer::render($pdfArchive)->toHtml();
+        $docHtml = ArchivePreviewRenderer::render($docArchive)->toHtml();
+
+        $this->assertStringContainsString(route('archive.preview', ['archive' => $pdfArchive->id]), $pdfHtml);
+        $this->assertStringNotContainsString('/storage/archives/preview.pdf', $pdfHtml);
+        $this->assertStringContainsString('/storage/archives/preview.docx', $docHtml);
     }
 
     /**

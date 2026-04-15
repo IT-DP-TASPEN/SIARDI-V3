@@ -49,7 +49,7 @@
     }
 
     .siardi-workspace-stack {
-        @apply mt-6 space-y-4;
+        @apply space-y-4;
     }
 
     .siardi-surface-card {

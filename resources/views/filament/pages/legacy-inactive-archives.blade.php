@@ -139,7 +139,7 @@
                 @php
                     $marker = $selectedArchive->legacyInactiveMarker;
                 @endphp
-                <div class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,1fr)]">
+                <div class="grid items-start gap-x-6 gap-y-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,1fr)] xl:gap-x-8">
                     <div class="siardi-workspace-stack">
                         <div class="siardi-surface-card">
                             <div class="space-y-4">

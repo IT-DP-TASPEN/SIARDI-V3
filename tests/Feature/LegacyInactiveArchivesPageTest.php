@@ -73,7 +73,10 @@ class LegacyInactiveArchivesPageTest extends TestCase
             ->test(LegacyInactiveArchives::class)
             ->call('selectArchive', $archive->id)
             ->assertSee('Preview Arsip')
-            ->assertSee('Isi preview inactive');
+            ->assertSee('Isi preview inactive')
+            ->assertSee('items-start', false)
+            ->assertSee('gap-y-8', false)
+            ->assertSee(route('archive.preview', ['archive' => $archive->id]), false);
     }
 
     /**
