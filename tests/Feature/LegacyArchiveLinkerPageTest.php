@@ -515,6 +515,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $this->actingAs($user)
             ->get(LegacyArchiveLinker::getUrl())
             ->assertOk()
+            ->assertSee('fi-pagination', false)
             ->assertSee('Queue 51')
             ->assertDontSee('Queue 01')
             ->assertDontSee('Queue Inactive');
@@ -522,6 +523,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $this->actingAs($user)
             ->get(LegacyArchiveLinker::getUrl().'?page=2')
             ->assertOk()
+            ->assertSee('fi-pagination', false)
             ->assertSee('Queue 01')
             ->assertDontSee('Queue 02')
             ->assertDontSee('Queue Inactive');

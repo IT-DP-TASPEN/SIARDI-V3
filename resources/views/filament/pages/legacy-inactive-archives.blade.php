@@ -115,7 +115,7 @@
 
                 @if ($archives->hasPages())
                     <div>
-                        {{ $archives->links() }}
+                        <x-filament::pagination :paginator="$archives" />
                     </div>
                 @endif
             </div>

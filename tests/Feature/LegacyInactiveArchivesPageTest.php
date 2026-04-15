@@ -9,6 +9,7 @@ use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\LegacyArchiveInactive;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -77,6 +78,51 @@ class LegacyInactiveArchivesPageTest extends TestCase
             ->assertSee('items-start', false)
             ->assertSee('gap-y-8', false)
             ->assertSee(route('archive.preview', ['archive' => $archive->id]), false);
+    }
+
+    public function test_inactive_page_uses_filament_pagination_for_multiple_results(): void
+    {
+        [$user, $category, $branch] = $this->createScopedUser();
+
+        foreach (range(1, 51) as $index) {
+            $archive = Archive::query()->create([
+                'archive_category' => $category->id,
+                'archive_user' => $user->id,
+                'archive_name' => sprintf('Inactive Queue %02d', $index),
+                'archive_code' => sprintf('INA-Q-%02d', $index),
+                'archive_description' => 'Archive',
+                'archive_path' => sprintf('archives/inactive-queue-%02d.pdf', $index),
+                'archive_type' => 'pdf',
+                'archive_branch_office' => $branch->id,
+                'archive_date' => '2026-04-12',
+            ]);
+
+            $timestamp = Carbon::parse('2026-04-12 08:00:00')->addMinutes($index);
+            $archive->forceFill([
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ])->saveQuietly();
+
+            LegacyArchiveInactive::query()->create([
+                'archive_id' => $archive->id,
+                'marked_inactive_by' => $user->id,
+                'marked_inactive_at' => $timestamp,
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get(LegacyInactiveArchives::getUrl())
+            ->assertOk()
+            ->assertSee('fi-pagination', false)
+            ->assertSee('Inactive Queue 51')
+            ->assertDontSee('Inactive Queue 01');
+
+        $this->actingAs($user)
+            ->get(LegacyInactiveArchives::getUrl().'?page=2')
+            ->assertOk()
+            ->assertSee('fi-pagination', false)
+            ->assertSee('Inactive Queue 01')
+            ->assertDontSee('Inactive Queue 02');
     }
 
     /**
