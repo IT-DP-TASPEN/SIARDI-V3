@@ -152,4 +152,60 @@
     .siardi-signature-role {
         @apply mt-3 text-right text-xs font-medium uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400;
     }
+
+    .siardi-preview-stack {
+        @apply space-y-3;
+    }
+
+    .siardi-preview-link {
+        @apply text-sm font-medium text-primary-600 underline underline-offset-2;
+    }
+
+    .siardi-preview-image {
+        @apply block w-full rounded-lg border border-gray-200 bg-white object-contain dark:border-white/10 dark:bg-gray-950/40;
+    }
+
+    .siardi-preview-video {
+        @apply block w-full rounded-lg border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-950/40;
+    }
+
+    .siardi-preview-text {
+        @apply overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200;
+    }
+
+    .siardi-pdf-preview {
+        @apply space-y-3;
+    }
+
+    .siardi-pdf-preview__toolbar {
+        @apply flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-gray-900/80 sm:flex-row sm:items-center sm:justify-between;
+    }
+
+    .siardi-pdf-preview__control-group {
+        @apply flex flex-wrap items-center gap-2;
+    }
+
+    .siardi-pdf-preview__button {
+        @apply inline-flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10;
+    }
+
+    .siardi-pdf-preview__meta {
+        @apply text-xs font-medium text-gray-500 dark:text-gray-400;
+    }
+
+    .siardi-pdf-preview__viewport {
+        @apply relative overflow-auto rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-950/40;
+    }
+
+    .siardi-pdf-preview__state {
+        @apply flex min-h-full items-center justify-center px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400;
+    }
+
+    .siardi-pdf-preview__state--error {
+        @apply text-danger-600 dark:text-danger-400;
+    }
+
+    .siardi-pdf-preview__canvas {
+        @apply block h-auto min-w-full bg-white dark:bg-white;
+    }
 }

@@ -80,6 +80,41 @@ class LegacyInactiveArchivesPageTest extends TestCase
             ->assertSee('/storage/archives/inactive-preview.txt', false);
     }
 
+    public function test_inactive_modal_shows_pdfjs_preview_shell_for_pdf_files(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('archives/inactive-preview.pdf', '%PDF-1.4 inactive');
+
+        [$user] = $this->createScopedUser();
+
+        $archive = Archive::query()->create([
+            'archive_category' => $user->permittedCategories()->firstOrFail()->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Inactive PDF Preview Archive',
+            'archive_code' => 'INA-PDF-001',
+            'archive_description' => 'Archive',
+            'archive_path' => 'archives/inactive-preview.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $user->branch_office_id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        LegacyArchiveInactive::query()->create([
+            'archive_id' => $archive->id,
+            'marked_inactive_by' => $user->id,
+            'marked_inactive_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(LegacyInactiveArchives::class)
+            ->call('selectArchive', $archive->id)
+            ->assertSee('Preview Arsip')
+            ->assertSee('data-siardi-pdf-preview', false)
+            ->assertSee('data-role="canvas"', false)
+            ->assertSee('/storage/archives/inactive-preview.pdf', false)
+            ->assertSee('Fit Width');
+    }
+
     public function test_inactive_page_uses_filament_pagination_for_multiple_results(): void
     {
         [$user, $category, $branch] = $this->createScopedUser();

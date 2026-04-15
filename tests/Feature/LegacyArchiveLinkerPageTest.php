@@ -398,6 +398,50 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertSee('/storage/archives/preview.txt', false);
     }
 
+    public function test_linking_modal_shows_pdfjs_preview_shell_for_pdf_files(): void
+    {
+        Storage::fake('public');
+
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'KC Karawang',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+        $this->assignRole($user, 'kearsipan');
+        $user->permittedCategories()->attach($category->id);
+
+        Storage::disk('public')->put('archives/modal-preview.pdf', '%PDF-1.4 preview');
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Legacy PDF Preview',
+            'archive_code' => 'PDF-LEG-001',
+            'archive_description' => 'Preview file',
+            'archive_path' => 'archives/modal-preview.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(LegacyArchiveLinker::class)
+            ->call('selectArchive', $archive->id)
+            ->assertSee('Preview Arsip')
+            ->assertSee('data-siardi-pdf-preview', false)
+            ->assertSee('data-role="canvas"', false)
+            ->assertSee('/storage/archives/modal-preview.pdf', false)
+            ->assertSee('Fit Width');
+    }
+
     public function test_mark_inactive_moves_archive_to_inactive_page(): void
     {
         $category = Category::query()->create([
@@ -529,7 +573,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertDontSee('Queue Inactive');
     }
 
-    public function test_preview_renderer_uses_storage_url_for_previewable_files_and_others(): void
+    public function test_preview_renderer_returns_pdfjs_markup_for_pdf_and_storage_url_for_others(): void
     {
         Storage::fake('public');
 
@@ -577,6 +621,9 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $pdfHtml = ArchivePreviewRenderer::render($pdfArchive)->toHtml();
         $docHtml = ArchivePreviewRenderer::render($docArchive)->toHtml();
 
+        $this->assertStringContainsString('data-siardi-pdf-preview', $pdfHtml);
+        $this->assertStringContainsString('data-role="canvas"', $pdfHtml);
+        $this->assertStringContainsString('Fit Width', $pdfHtml);
         $this->assertStringContainsString('/storage/archives/preview.pdf', $pdfHtml);
         $this->assertStringContainsString('/storage/archives/preview.docx', $docHtml);
     }

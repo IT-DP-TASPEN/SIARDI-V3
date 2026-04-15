@@ -26,22 +26,15 @@ class ArchivePreviewRenderer
         $extension = static::extension($archive);
 
         if ($extension === 'pdf') {
-            return new HtmlString(
-                <<<HTML
-                <div class="space-y-3">
-                    <iframe src="{$url}" class="w-full rounded-lg border" style="min-height: {$height};"></iframe>
-                    <a href="{$url}" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline">Buka / Download Arsip</a>
-                </div>
-                HTML,
-            );
+            return static::renderPdfPreview($url, e(basename((string) $archive->archive_path)), $height);
         }
 
         if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
             return new HtmlString(
                 <<<HTML
-                <div class="space-y-3">
-                    <img src="{$url}" alt="Preview Arsip" class="w-full rounded-lg border object-contain" style="max-height: {$height};">
-                    <a href="{$url}" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline">Buka / Download Arsip</a>
+                <div class="siardi-preview-stack">
+                    <img src="{$url}" alt="Preview Arsip" class="siardi-preview-image" style="max-height: {$height};">
+                    <a href="{$url}" target="_blank" rel="noopener noreferrer" class="siardi-preview-link">Buka / Download Arsip</a>
                 </div>
                 HTML,
             );
@@ -50,11 +43,11 @@ class ArchivePreviewRenderer
         if (in_array($extension, ['mp4', 'webm', 'avi', 'mkv'], true)) {
             return new HtmlString(
                 <<<HTML
-                <div class="space-y-3">
-                    <video controls class="w-full rounded-lg border" style="max-height: {$height};">
+                <div class="siardi-preview-stack">
+                    <video controls class="siardi-preview-video" style="max-height: {$height};">
                         <source src="{$url}">
                     </video>
-                    <a href="{$url}" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline">Buka / Download Arsip</a>
+                    <a href="{$url}" target="_blank" rel="noopener noreferrer" class="siardi-preview-link">Buka / Download Arsip</a>
                 </div>
                 HTML,
             );
@@ -64,7 +57,7 @@ class ArchivePreviewRenderer
             return static::renderTextPreview($archive->archive_path, $url, $height);
         }
 
-        return new HtmlString("<a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-primary-600 underline\">Buka / Download Arsip</a>");
+        return new HtmlString("<a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"siardi-preview-link\">Buka / Download Arsip</a>");
     }
 
     private static function renderTextPreview(string $path, string $url, string $height): HtmlString
@@ -74,7 +67,7 @@ class ArchivePreviewRenderer
         try {
             if ($disk->size($path) > self::TEXT_PREVIEW_MAX_BYTES) {
                 return new HtmlString(
-                    "<div class=\"space-y-3\"><p class=\"text-sm text-gray-500\">Preview teks dibatasi karena file terlalu besar.</p><a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-primary-600 underline\">Buka / Download Arsip</a></div>",
+                    "<div class=\"siardi-preview-stack\"><p class=\"text-sm text-gray-500\">Preview teks dibatasi karena file terlalu besar.</p><a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"siardi-preview-link\">Buka / Download Arsip</a></div>",
                 );
             }
 
@@ -82,15 +75,54 @@ class ArchivePreviewRenderer
 
             return new HtmlString(
                 <<<HTML
-                <div class="space-y-3">
-                    <pre class="overflow-auto rounded-lg border bg-gray-50 p-4 text-xs text-gray-700 dark:bg-white/5 dark:text-gray-200" style="max-height: {$height}; white-space: pre-wrap;">{$content}</pre>
-                    <a href="{$url}" target="_blank" rel="noopener noreferrer" class="text-primary-600 underline">Buka / Download Arsip</a>
+                <div class="siardi-preview-stack">
+                    <pre class="siardi-preview-text" style="max-height: {$height}; white-space: pre-wrap;">{$content}</pre>
+                    <a href="{$url}" target="_blank" rel="noopener noreferrer" class="siardi-preview-link">Buka / Download Arsip</a>
                 </div>
                 HTML,
             );
         } catch (\Throwable) {
-            return new HtmlString("<a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-primary-600 underline\">Buka / Download Arsip</a>");
+            return new HtmlString("<a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"siardi-preview-link\">Buka / Download Arsip</a>");
         }
+    }
+
+    private static function renderPdfPreview(string $url, string $filename, string $height): HtmlString
+    {
+        return new HtmlString(
+            <<<HTML
+            <div
+                class="siardi-pdf-preview"
+                data-siardi-pdf-preview
+                data-src="{$url}"
+                data-filename="{$filename}"
+                data-height="{$height}"
+            >
+                <div class="siardi-pdf-preview__toolbar" role="toolbar" aria-label="Kontrol preview PDF">
+                    <div class="siardi-pdf-preview__control-group">
+                        <button type="button" class="siardi-pdf-preview__button" data-action="prev">Sebelumnya</button>
+                        <span class="siardi-pdf-preview__meta" data-role="page-indicator">Halaman 1 / --</span>
+                        <button type="button" class="siardi-pdf-preview__button" data-action="next">Berikutnya</button>
+                    </div>
+                    <div class="siardi-pdf-preview__control-group">
+                        <button type="button" class="siardi-pdf-preview__button" data-action="zoom-out">-</button>
+                        <span class="siardi-pdf-preview__meta" data-role="zoom-indicator">100%</span>
+                        <button type="button" class="siardi-pdf-preview__button" data-action="zoom-in">+</button>
+                        <button type="button" class="siardi-pdf-preview__button" data-action="fit-width">Fit Width</button>
+                    </div>
+                </div>
+
+                <div class="siardi-pdf-preview__viewport" data-role="viewport" style="min-height: {$height};">
+                    <div class="siardi-pdf-preview__state" data-role="loading">Memuat preview PDF...</div>
+                    <div class="siardi-pdf-preview__state siardi-pdf-preview__state--error" data-role="error" hidden>
+                        Preview PDF gagal dimuat. Gunakan link di bawah untuk membuka file.
+                    </div>
+                    <canvas class="siardi-pdf-preview__canvas" data-role="canvas" hidden></canvas>
+                </div>
+
+                <a href="{$url}" target="_blank" rel="noopener noreferrer" class="siardi-preview-link">Buka / Download Arsip</a>
+            </div>
+            HTML,
+        );
     }
 
     private static function extension(Archive $archive): string

@@ -10,6 +10,7 @@ use App\Models\CategoryReferenceField;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class LegacyArchiveCompatibilityTest extends TestCase
@@ -128,6 +129,36 @@ class LegacyArchiveCompatibilityTest extends TestCase
             ->assertOk()
             ->assertDontSee('Nomor Perjanjian Kredit')
             ->assertDontSee('PK-LEGACY-001');
+    }
+
+    public function test_archive_view_uses_pdfjs_preview_shell_for_pdf_files(): void
+    {
+        Storage::fake('public');
+
+        [$branch, $category, $user] = $this->createArchiveUserContext();
+
+        Storage::disk('public')->put('archives/view-preview.pdf', '%PDF-1.4 preview');
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'PDF.js Archive View',
+            'archive_code' => 'VIEW-001',
+            'archive_description' => 'Archive view preview',
+            'archive_path' => 'archives/view-preview.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        $this->actingAs($user)
+            ->get("/arsip_digital/archives/{$archive->id}")
+            ->assertOk()
+            ->assertSee('PDF.js Archive View')
+            ->assertSee('data-siardi-pdf-preview', false)
+            ->assertSee('data-role="canvas"', false)
+            ->assertSee('/storage/archives/view-preview.pdf', false)
+            ->assertSee('Fit Width');
     }
 
     /**
