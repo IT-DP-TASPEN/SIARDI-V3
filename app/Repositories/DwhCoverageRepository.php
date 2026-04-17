@@ -6,6 +6,7 @@ use App\Models\ArchiveBusinessReference;
 use App\Models\Category;
 use App\Models\CategoryReferenceField;
 use App\Models\DwhBranchMapping;
+use App\Support\ReferenceNormalizer;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class DwhCoverageRepository
         'TABUNGAN' => [
             'table' => 'raw_savings',
             'business_key_column' => 'norekening',
+            'alternate_business_key_column' => 'noalt',
             'cif_column' => 'nocif',
             'branch_column' => 'locationid',
             'status_column' => 'status_dokumen',
@@ -31,6 +33,7 @@ class DwhCoverageRepository
         'KREDIT' => [
             'table' => 'raw_loans',
             'business_key_column' => 'id',
+            'alternate_business_key_column' => 'noalt',
             'cif_column' => 'nocif',
             'branch_column' => 'locationid',
             'status_column' => 'status_dokumen',
@@ -205,6 +208,65 @@ class DwhCoverageRepository
             'matched_table' => $definition['table'],
             'matched_source_key' => (string) $match->source_key,
         ];
+    }
+
+    /**
+     * @return array{matched_table: string, matched_source_key: string, canonical_raw_value: string, canonical_normalized_value: string, matched_via_alternate: bool}|null
+     */
+    public function resolveCanonicalPrimaryReferenceMatch(
+        CategoryReferenceField $field,
+        string $normalizedValue,
+        ?string $dwhLocationCode = null,
+    ): ?array {
+        if (! $field->is_primary_match_key) {
+            return null;
+        }
+
+        $category = $field->category;
+        $definition = $category ? $this->resolveDefinition($category) : null;
+
+        if ($definition === null) {
+            return null;
+        }
+
+        $primaryColumn = $definition['reference_columns'][$field->reference_type] ?? null;
+
+        if ($primaryColumn === null || $primaryColumn !== $definition['business_key_column']) {
+            return null;
+        }
+
+        $directMatch = $this->findCanonicalBusinessKeyMatch(
+            $definition,
+            $field,
+            $primaryColumn,
+            $normalizedValue,
+            $dwhLocationCode,
+        );
+
+        if ($directMatch) {
+            return $directMatch + ['matched_via_alternate' => false];
+        }
+
+        $alternateColumn = $definition['alternate_business_key_column'] ?? null;
+        $alternateLookupValue = preg_replace('/\D+/', '', $normalizedValue) ?: '';
+
+        if ($alternateColumn === null || $alternateLookupValue === '') {
+            return null;
+        }
+
+        $alternateMatch = $this->findCanonicalBusinessKeyMatch(
+            $definition,
+            $field,
+            $alternateColumn,
+            $alternateLookupValue,
+            $dwhLocationCode,
+        );
+
+        if (! $alternateMatch) {
+            return null;
+        }
+
+        return $alternateMatch + ['matched_via_alternate' => true];
     }
 
     /**
@@ -393,6 +455,48 @@ class DwhCoverageRepository
         $categoryName = $category instanceof Category ? $category->category_name : $category;
 
         return self::CATEGORY_MAP[$categoryName] ?? null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     * @return array{matched_table: string, matched_source_key: string, canonical_raw_value: string, canonical_normalized_value: string}|null
+     */
+    private function findCanonicalBusinessKeyMatch(
+        array $definition,
+        CategoryReferenceField $field,
+        string $lookupColumn,
+        string $lookupValue,
+        ?string $dwhLocationCode = null,
+    ): ?array {
+        $match = DB::connection('dwh')
+            ->table($definition['table'])
+            ->when($dwhLocationCode, fn (QueryBuilder $query) => $query->where($definition['branch_column'], $dwhLocationCode))
+            ->whereRaw("{$this->normalizedSql($lookupColumn)} = ?", [$lookupValue])
+            ->first([
+                $definition['source_key_column'].' as source_key',
+                $definition['business_key_column'].' as business_key',
+            ]);
+
+        if (! $match) {
+            return null;
+        }
+
+        $canonicalRawValue = trim((string) ($match->business_key ?? ''));
+        $canonicalNormalizedValue = ReferenceNormalizer::normalize(
+            $canonicalRawValue,
+            $field->normalizer ?? 'uppercase_compact',
+        );
+
+        if ($canonicalRawValue === '' || ! filled($canonicalNormalizedValue)) {
+            return null;
+        }
+
+        return [
+            'matched_table' => $definition['table'],
+            'matched_source_key' => (string) $match->source_key,
+            'canonical_raw_value' => $canonicalRawValue,
+            'canonical_normalized_value' => $canonicalNormalizedValue,
+        ];
     }
 
     private function normalizedSql(string $column): string

@@ -151,25 +151,38 @@ class ArchiveBusinessReferenceService
                 continue;
             }
 
-            $match = $this->dwhCoverageRepository->matchReference(
-                $field,
-                (string) $reference->normalized_value,
-                $dwhLocationCode,
-            );
+            $match = $field->is_primary_match_key
+                ? $this->dwhCoverageRepository->resolveCanonicalPrimaryReferenceMatch(
+                    $field,
+                    (string) $reference->normalized_value,
+                    $dwhLocationCode,
+                )
+                : null;
 
-            $matchedTable = $match['matched_table'] ?? null;
-            $matchedSourceKey = $match['matched_source_key'] ?? null;
+            if (! $match) {
+                $match = $this->dwhCoverageRepository->matchReference(
+                    $field,
+                    (string) $reference->normalized_value,
+                    $dwhLocationCode,
+                );
+            }
 
-            if ($reference->matched_table !== $matchedTable || $reference->matched_source_key !== $matchedSourceKey) {
-                $reference->forceFill([
-                    'matched_table' => $matchedTable,
-                    'matched_source_key' => $matchedSourceKey,
-                ])->save();
+            $updates = [
+                'matched_table' => $match['matched_table'] ?? null,
+                'matched_source_key' => $match['matched_source_key'] ?? null,
+            ];
 
+            if (($match['matched_via_alternate'] ?? false) === true) {
+                $updates['raw_value'] = $match['canonical_raw_value'] ?? $reference->raw_value;
+                $updates['normalized_value'] = $match['canonical_normalized_value'] ?? $reference->normalized_value;
+            }
+
+            if ($this->referenceNeedsRematchUpdate($reference, $updates)) {
+                $reference->forceFill($updates)->save();
                 $updatedReferences++;
             }
 
-            if (filled($matchedSourceKey)) {
+            if (filled($updates['matched_source_key'])) {
                 $matchedReferences++;
             } else {
                 $unmatchedReferences++;
@@ -485,5 +498,19 @@ class ArchiveBusinessReferenceService
             })
             ->filter(fn (string $value): bool => filled($value))
             ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $updates
+     */
+    private function referenceNeedsRematchUpdate(ArchiveBusinessReference $reference, array $updates): bool
+    {
+        foreach ($updates as $attribute => $value) {
+            if ($reference->{$attribute} !== $value) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

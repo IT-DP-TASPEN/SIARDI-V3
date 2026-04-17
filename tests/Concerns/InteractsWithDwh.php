@@ -29,6 +29,7 @@ trait InteractsWithDwh
             $table->string('locationid')->nullable();
             $table->string('nocif')->nullable();
             $table->string('norekening')->nullable();
+            $table->string('noalt')->nullable();
             $table->string('status_dokumen')->nullable();
         });
     }
