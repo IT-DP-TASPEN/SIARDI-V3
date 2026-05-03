@@ -490,7 +490,7 @@ class ArchiveBusinessReferenceService
                     return [$key => ''];
                 }
 
-                if ($key === 'loan_alt_account_no') {
+                if (in_array($key, ['loan_alt_account_no', 'savings_alt_account_no'], true)) {
                     return [$key => preg_replace('/\D+/', '', $value) ?: ''];
                 }
 

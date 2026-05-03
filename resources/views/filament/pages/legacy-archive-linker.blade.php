@@ -222,6 +222,27 @@
                                     </label>
                                 @endforeach
 
+                                @if ($selectedArchive->category?->category_name === 'TABUNGAN')
+                                    <label class="siardi-filter-field">
+                                        <span class="siardi-filter-label">
+                                            Alt Rekening Tabungan
+                                            <x-filament::badge color="gray">Search Helper</x-filament::badge>
+                                        </span>
+                                        <x-filament::input.wrapper x-on:focus-input.stop="$el.querySelector('input')?.focus()">
+                                            <input type="text" wire:model.defer="candidateSearchInputs.savings_alt_account_no" class="fi-input">
+                                        </x-filament::input.wrapper>
+                                        <span class="siardi-filter-help">
+                                            Hanya untuk pencarian kandidat tabungan. Nilai ini tidak disimpan sebagai referensi arsip.
+                                        </span>
+                                        @if (! empty($suggestions['savings_alt_account_no'] ?? null))
+                                            <div class="flex flex-wrap gap-2">
+                                                <x-filament::badge color="warning">Suggestion</x-filament::badge>
+                                                <x-filament::badge color="gray">{{ $suggestions['savings_alt_account_no'] }}</x-filament::badge>
+                                            </div>
+                                        @endif
+                                    </label>
+                                @endif
+
                                 @if ($selectedArchive->category?->category_name === 'KREDIT')
                                     <label class="siardi-filter-field">
                                         <span class="siardi-filter-label">
@@ -309,6 +330,7 @@
                                                                 @if (filled($value))
                                                                     @php
                                                                         $referenceLabel = match ($referenceType) {
+                                                                            'savings_alt_account_no' => 'Alt Rekening Tabungan',
                                                                             'loan_alt_account_no' => 'Alt Rekening Kredit',
                                                                             default => $referenceType,
                                                                         };

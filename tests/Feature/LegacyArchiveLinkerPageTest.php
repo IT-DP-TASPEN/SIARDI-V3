@@ -269,6 +269,98 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $this->assertDatabaseCount('archive_business_references', 0);
     }
 
+    public function test_tabungan_candidate_lookup_can_use_alt_rekening_search_helper(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        $cifField = CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'cif',
+            'label' => 'CIF',
+            'input_type' => 'text',
+            'sort_order' => 10,
+            'is_required' => true,
+            'is_primary_match_key' => false,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'savings',
+        ]);
+
+        $primaryField = CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'savings_account_no',
+            'label' => 'Nomor Rekening Tabungan',
+            'input_type' => 'text',
+            'sort_order' => 20,
+            'is_required' => true,
+            'is_primary_match_key' => true,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'savings',
+        ]);
+
+        $branch = BranchOffice::query()->create([
+            'branch_code' => '01',
+            'branch_name' => 'KC Karawang',
+        ]);
+
+        $user = User::factory()->create([
+            'branch_office_id' => $branch->id,
+        ]);
+        $this->assignRole($user, 'kearsipan');
+        $user->permittedCategories()->attach($category->id);
+
+        DwhBranchMapping::query()->create([
+            'branch_office_id' => $branch->id,
+            'siardi_branch_code' => '01',
+            'dwh_location_code' => '001',
+            'dwh_location_name' => 'KC Karawang',
+            'is_active' => true,
+        ]);
+
+        DB::connection('dwh')->table('raw_savings')->insert([
+            '_row_key' => 'SAVINGS-ALT-1',
+            'as_of_date' => '2026-04-12',
+            'locationid' => '001',
+            'nocif' => '00100055555',
+            'norekening' => '001000000000001',
+            'noalt' => '9988776655',
+            'status_dokumen' => 'Active',
+        ]);
+
+        $archive = Archive::query()->create([
+            'archive_category' => $category->id,
+            'archive_user' => $user->id,
+            'archive_name' => 'Tabungan 99.887.76655',
+            'archive_code' => 'TBG-ALT-001',
+            'archive_description' => 'Legacy tabungan archive',
+            'archive_path' => 'archives/99.887.76655 - tabungan.pdf',
+            'archive_type' => 'pdf',
+            'archive_branch_office' => $branch->id,
+            'archive_date' => '2026-04-12',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(LegacyArchiveLinker::class)
+            ->call('selectArchive', $archive->id)
+            ->assertSee('Alt Rekening Tabungan')
+            ->assertSet('candidateSearchInputs.savings_alt_account_no', '9988776655')
+            ->set('candidateSearchInputs.savings_alt_account_no', '99.887.76655')
+            ->call('lookupCandidates')
+            ->assertSet('candidateResults.0.source_key', 'SAVINGS-ALT-1')
+            ->call('applyCandidate', 0)
+            ->assertSet("referenceInputs.{$cifField->id}", '00100055555')
+            ->assertSet("referenceInputs.{$primaryField->id}", '001000000000001')
+            ->call('saveReferences')
+            ->assertDispatched('close-modal', id: LegacyArchiveLinker::LINKING_MODAL_ID);
+
+        $this->assertDatabaseMissing('archive_business_references', [
+            'archive_id' => $archive->id,
+            'reference_type' => 'savings_alt_account_no',
+        ]);
+    }
+
     public function test_kredit_candidate_lookup_can_use_alt_rekening_search_helper(): void
     {
         $category = Category::query()->create([

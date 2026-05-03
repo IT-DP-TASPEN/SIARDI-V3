@@ -247,6 +247,63 @@ class DwhCoverageRepositoryTest extends TestCase
         $this->assertSame('001000000000001', $candidates->first()['reference_values']['savings_account_no']);
     }
 
+    public function test_search_reference_candidates_can_match_tabungan_alt_rekening(): void
+    {
+        $category = Category::query()->create([
+            'category_name' => 'TABUNGAN',
+            'category_description' => 'Tabungan',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'cif',
+            'label' => 'CIF',
+            'input_type' => 'text',
+            'sort_order' => 10,
+            'is_required' => true,
+            'is_primary_match_key' => false,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'savings',
+        ]);
+
+        CategoryReferenceField::query()->create([
+            'category_id' => $category->id,
+            'reference_type' => 'savings_account_no',
+            'label' => 'Nomor Rekening Tabungan',
+            'input_type' => 'text',
+            'sort_order' => 20,
+            'is_required' => true,
+            'is_primary_match_key' => true,
+            'normalizer' => 'uppercase_compact',
+            'dwh_entity' => 'savings',
+        ]);
+
+        DB::connection('dwh')->table('raw_savings')->insert([
+            [
+                '_row_key' => 'SAVINGS-ALT-1',
+                'as_of_date' => '2026-04-12',
+                'locationid' => '001',
+                'nocif' => '00100077777',
+                'norekening' => '001000000000001',
+                'noalt' => '9988776655',
+                'status_dokumen' => 'Active',
+            ],
+        ]);
+
+        $candidates = app(DwhCoverageRepository::class)->searchReferenceCandidates(
+            $category,
+            '001',
+            [
+                'savings_alt_account_no' => '99.887.76655',
+            ],
+        );
+
+        $this->assertCount(1, $candidates);
+        $this->assertSame('SAVINGS-ALT-1', $candidates->first()['source_key']);
+        $this->assertSame('9988776655', $candidates->first()['reference_values']['savings_alt_account_no']);
+        $this->assertSame('001000000000001', $candidates->first()['reference_values']['savings_account_no']);
+    }
+
     public function test_search_reference_candidates_can_match_kredit_alt_rekening(): void
     {
         $category = Category::query()->create([

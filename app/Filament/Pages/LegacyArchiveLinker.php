@@ -113,6 +113,7 @@ class LegacyArchiveLinker extends Page
         $this->suggestions = $service->getLegacySuggestions($archive);
         $this->referenceInputs = [];
         $this->candidateSearchInputs = [
+            'savings_alt_account_no' => $this->suggestions['savings_alt_account_no'] ?? '',
             'loan_alt_account_no' => $this->suggestions['loan_alt_account_no'] ?? '',
         ];
         $this->candidateResults = [];
@@ -219,6 +220,10 @@ class LegacyArchiveLinker extends Page
 
         if (isset($candidate['reference_values']['loan_alt_account_no'])) {
             $this->candidateSearchInputs['loan_alt_account_no'] = $candidate['reference_values']['loan_alt_account_no'];
+        }
+
+        if (isset($candidate['reference_values']['savings_alt_account_no'])) {
+            $this->candidateSearchInputs['savings_alt_account_no'] = $candidate['reference_values']['savings_alt_account_no'];
         }
 
         Notification::make()

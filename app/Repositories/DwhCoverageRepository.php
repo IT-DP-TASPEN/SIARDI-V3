@@ -28,6 +28,7 @@ class DwhCoverageRepository
             'reference_columns' => [
                 'cif' => 'nocif',
                 'savings_account_no' => 'norekening',
+                'savings_alt_account_no' => 'noalt',
             ],
         ],
         'KREDIT' => [
@@ -508,7 +509,7 @@ class DwhCoverageRepository
     {
         $value = trim((string) $value);
 
-        if ($referenceType === 'loan_alt_account_no') {
+        if (in_array($referenceType, ['loan_alt_account_no', 'savings_alt_account_no'], true)) {
             return preg_replace('/\D+/', '', $value) ?: '';
         }
 
