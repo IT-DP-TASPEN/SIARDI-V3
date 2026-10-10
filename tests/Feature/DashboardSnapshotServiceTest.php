@@ -25,7 +25,7 @@ class DashboardSnapshotServiceTest extends TestCase
         parent::setUp();
 
         $this->setUpDwhConnection();
-        $this->createRawSavingsTable();
+        $this->createSavingDetailsTable();
     }
 
     public function test_archive_overview_respects_user_branch_and_category_scope(): void
@@ -182,12 +182,12 @@ class DashboardSnapshotServiceTest extends TestCase
         ]);
         $this->assignRole($admin, 'super_admin');
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            ['_row_key' => 'A1', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000001', 'norekening' => '001000000000001', 'status_dokumen' => 'Active'],
-            ['_row_key' => 'A2', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000002', 'norekening' => '001000000000002', 'status_dokumen' => 'Active'],
-            ['_row_key' => 'B1', 'as_of_date' => '2026-04-10', 'locationid' => '002', 'nocif' => '00200000001', 'norekening' => '002000000000001', 'status_dokumen' => 'Active'],
-            ['_row_key' => 'B2', 'as_of_date' => '2026-04-10', 'locationid' => '002', 'nocif' => '00200000002', 'norekening' => '002000000000002', 'status_dokumen' => 'Active'],
-            ['_row_key' => 'B3', 'as_of_date' => '2026-04-10', 'locationid' => '002', 'nocif' => '00200000003', 'norekening' => '002000000000003', 'status_dokumen' => 'Active'],
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            ['location_id' => '001', 'cif_no' => '00100000001', 'account_no' => '001000000000001', 'document_status' => 'Active'],
+            ['location_id' => '001', 'cif_no' => '00100000002', 'account_no' => '001000000000002', 'document_status' => 'Active'],
+            ['location_id' => '002', 'cif_no' => '00200000001', 'account_no' => '002000000000001', 'document_status' => 'Active'],
+            ['location_id' => '002', 'cif_no' => '00200000002', 'account_no' => '002000000000002', 'document_status' => 'Active'],
+            ['location_id' => '002', 'cif_no' => '00200000003', 'account_no' => '002000000000003', 'document_status' => 'Active'],
         ]);
 
         $archive = Archive::query()->create([
@@ -220,5 +220,11 @@ class DashboardSnapshotServiceTest extends TestCase
         $this->assertSame(20.0, $overview['coverage_percentage']);
         $this->assertSame('02', $hotspots->first()['branch_code']);
         $this->assertSame(3, $hotspots->first()['missing_count']);
+
+        // DWH table unreachable -> graceful fallback instead of an exception.
+        DB::connection('dwh')->getSchemaBuilder()->drop('fincloud_saving_details');
+
+        $this->assertFalse($service->getCoverageOverview($admin)['available']);
+        $this->assertTrue($service->getCoverageHotspots($admin)->isEmpty());
     }
 }

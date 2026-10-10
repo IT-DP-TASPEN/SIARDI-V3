@@ -18,43 +18,43 @@ class DwhCoverageRepository
      */
     private const CATEGORY_MAP = [
         'TABUNGAN' => [
-            'table' => 'raw_savings',
-            'business_key_column' => 'norekening',
-            'alternate_business_key_column' => 'noalt',
-            'cif_column' => 'nocif',
-            'branch_column' => 'locationid',
-            'status_column' => 'status_dokumen',
-            'source_key_column' => '_row_key',
+            'table' => 'fincloud_saving_details',
+            'business_key_column' => 'account_no',
+            'alternate_business_key_column' => 'alt_no',
+            'cif_column' => 'cif_no',
+            'branch_column' => 'location_id',
+            'status_column' => 'document_status',
+            'source_key_column' => 'account_no',
             'reference_columns' => [
-                'cif' => 'nocif',
-                'savings_account_no' => 'norekening',
-                'savings_alt_account_no' => 'noalt',
+                'cif' => 'cif_no',
+                'savings_account_no' => 'account_no',
+                'savings_alt_account_no' => 'alt_no',
             ],
         ],
         'KREDIT' => [
-            'table' => 'raw_loans',
-            'business_key_column' => 'id',
-            'alternate_business_key_column' => 'noalt',
-            'cif_column' => 'nocif',
-            'branch_column' => 'locationid',
-            'status_column' => 'status_dokumen',
-            'source_key_column' => '_row_key',
+            'table' => 'fincloud_loan_details',
+            'business_key_column' => 'account_no',
+            'alternate_business_key_column' => 'alt_no',
+            'cif_column' => 'cif_no',
+            'branch_column' => 'location_id',
+            'status_column' => 'document_status',
+            'source_key_column' => 'account_no',
             'reference_columns' => [
-                'cif' => 'nocif',
-                'loan_account_no' => 'id',
-                'loan_alt_account_no' => 'noalt',
+                'cif' => 'cif_no',
+                'loan_account_no' => 'account_no',
+                'loan_alt_account_no' => 'alt_no',
             ],
         ],
         'BILYET DEPOSITO' => [
-            'table' => 'raw_time_deposits',
-            'business_key_column' => 'nobilyet',
-            'cif_column' => 'nocif',
-            'branch_column' => 'locationid',
-            'status_column' => 'status_dokumen',
-            'source_key_column' => '_row_key',
+            'table' => 'fincloud_time_deposit_details',
+            'business_key_column' => 'certificate_no',
+            'cif_column' => 'cif_no',
+            'branch_column' => 'location_id',
+            'status_column' => 'document_status',
+            'source_key_column' => 'account_no',
             'reference_columns' => [
-                'cif' => 'nocif',
-                'deposito_bilyet_no' => 'nobilyet',
+                'cif' => 'cif_no',
+                'deposito_bilyet_no' => 'certificate_no',
             ],
         ],
     ];
@@ -195,9 +195,7 @@ class DwhCoverageRepository
             return null;
         }
 
-        $match = DB::connection('dwh')
-            ->table($definition['table'])
-            ->when($dwhLocationCode, fn (QueryBuilder $query) => $query->where($definition['branch_column'], $dwhLocationCode))
+        $match = $this->buildTargetQuery($category, $dwhLocationCode)
             ->whereRaw("{$this->normalizedSql($column)} = ?", [$normalizedValue])
             ->first([$definition['source_key_column'].' as source_key']);
 
@@ -439,7 +437,14 @@ class DwhCoverageRepository
     private function buildTargetQuery(Category $category, ?string $dwhLocationCode = null): QueryBuilder
     {
         $definition = $this->resolveDefinition($category);
-        $query = DB::connection('dwh')->table($definition['table']);
+        $businessKey = $definition['business_key_column'];
+
+        // Current-state tables: every row with a usable business key is a target, regardless of
+        // document_status. certificate_no is nullable, so blank keys must not become bogus targets.
+        $query = DB::connection('dwh')
+            ->table($definition['table'])
+            ->whereNotNull($businessKey)
+            ->whereRaw("TRIM({$businessKey}) <> ''");
 
         if ($dwhLocationCode !== null) {
             $query->where($definition['branch_column'], $dwhLocationCode);
@@ -469,9 +474,7 @@ class DwhCoverageRepository
         string $lookupValue,
         ?string $dwhLocationCode = null,
     ): ?array {
-        $match = DB::connection('dwh')
-            ->table($definition['table'])
-            ->when($dwhLocationCode, fn (QueryBuilder $query) => $query->where($definition['branch_column'], $dwhLocationCode))
+        $match = $this->buildTargetQuery($field->category, $dwhLocationCode)
             ->whereRaw("{$this->normalizedSql($lookupColumn)} = ?", [$lookupValue])
             ->first([
                 $definition['source_key_column'].' as source_key',

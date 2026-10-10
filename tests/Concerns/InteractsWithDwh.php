@@ -21,42 +21,37 @@ trait InteractsWithDwh
         DB::reconnect('dwh');
     }
 
-    protected function createRawSavingsTable(): void
+    protected function createSavingDetailsTable(): void
     {
-        Schema::connection('dwh')->create('raw_savings', function (Blueprint $table): void {
-            $table->string('_row_key')->primary();
-            $table->date('as_of_date')->nullable();
-            $table->string('locationid')->nullable();
-            $table->string('nocif')->nullable();
-            $table->string('norekening')->nullable();
-            $table->string('noalt')->nullable();
-            $table->string('status_dokumen')->nullable();
+        Schema::connection('dwh')->create('fincloud_saving_details', function (Blueprint $table): void {
+            $table->string('account_no')->primary();
+            $table->string('cif_no');
+            $table->string('location_id')->nullable();
+            $table->string('alt_no')->nullable();
+            $table->string('document_status')->nullable();
         });
     }
 
-    protected function createRawLoansTable(): void
+    protected function createLoanDetailsTable(): void
     {
-        Schema::connection('dwh')->create('raw_loans', function (Blueprint $table): void {
-            $table->string('_row_key')->primary();
-            $table->date('as_of_date')->nullable();
-            $table->string('locationid')->nullable();
-            $table->string('nocif')->nullable();
-            $table->string('id')->nullable();
-            $table->string('noalt')->nullable();
-            $table->string('noperjanjiankredit')->nullable();
-            $table->string('status_dokumen')->nullable();
+        Schema::connection('dwh')->create('fincloud_loan_details', function (Blueprint $table): void {
+            $table->string('account_no')->primary();
+            $table->string('cif_no');
+            $table->string('location_id')->nullable();
+            $table->string('alt_no')->nullable();
+            $table->string('loan_agreement_no')->nullable();
+            $table->string('document_status')->nullable();
         });
     }
 
-    protected function createRawTimeDepositsTable(): void
+    protected function createTimeDepositDetailsTable(): void
     {
-        Schema::connection('dwh')->create('raw_time_deposits', function (Blueprint $table): void {
-            $table->string('_row_key')->primary();
-            $table->date('as_of_date')->nullable();
-            $table->string('locationid')->nullable();
-            $table->string('nocif')->nullable();
-            $table->string('nobilyet')->nullable();
-            $table->string('status_dokumen')->nullable();
+        Schema::connection('dwh')->create('fincloud_time_deposit_details', function (Blueprint $table): void {
+            $table->string('account_no')->primary();
+            $table->string('cif_no');
+            $table->string('location_id')->nullable();
+            $table->string('certificate_no')->nullable();
+            $table->string('document_status')->nullable();
         });
     }
 }

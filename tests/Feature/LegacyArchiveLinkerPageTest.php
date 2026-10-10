@@ -31,8 +31,8 @@ class LegacyArchiveLinkerPageTest extends TestCase
         parent::setUp();
 
         $this->setUpDwhConnection();
-        $this->createRawSavingsTable();
-        $this->createRawLoansTable();
+        $this->createSavingDetailsTable();
+        $this->createLoanDetailsTable();
     }
 
     public function test_selecting_archive_loading_candidates_and_saving_references_updates_the_workspace(): void
@@ -85,13 +85,11 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'is_active' => true,
         ]);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            '_row_key' => 'ROW-1',
-            'as_of_date' => '2026-04-10',
-            'locationid' => '001',
-            'nocif' => '00100013785',
-            'norekening' => '001000000000001',
-            'status_dokumen' => 'Active',
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            'location_id' => '001',
+            'cif_no' => '00100013785',
+            'account_no' => '001000000000001',
+            'document_status' => 'Active',
         ]);
 
         $archive = Archive::query()->create([
@@ -114,7 +112,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertSee('Legacy Savings Archive')
             ->set("referenceInputs.{$primaryField->id}", '001000000000001')
             ->call('lookupCandidates')
-            ->assertSet('candidateResults.0.source_key', 'ROW-1')
+            ->assertSet('candidateResults.0.source_key', '001000000000001')
             ->call('applyCandidate', 0)
             ->assertSet("referenceInputs.{$cifField->id}", '00100013785')
             ->call('saveReferences')
@@ -131,8 +129,8 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'archive_id' => $archive->id,
             'category_reference_field_id' => $primaryField->id,
             'raw_value' => '001000000000001',
-            'matched_table' => 'raw_savings',
-            'matched_source_key' => 'ROW-1',
+            'matched_table' => 'fincloud_saving_details',
+            'matched_source_key' => '001000000000001',
         ]);
     }
 
@@ -319,14 +317,12 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'is_active' => true,
         ]);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            '_row_key' => 'SAVINGS-ALT-1',
-            'as_of_date' => '2026-04-12',
-            'locationid' => '001',
-            'nocif' => '00100055555',
-            'norekening' => '001000000000001',
-            'noalt' => '9988776655',
-            'status_dokumen' => 'Active',
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            'location_id' => '001',
+            'cif_no' => '00100055555',
+            'account_no' => '001000000000001',
+            'alt_no' => '9988776655',
+            'document_status' => 'Active',
         ]);
 
         $archive = Archive::query()->create([
@@ -348,7 +344,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertSet('candidateSearchInputs.savings_alt_account_no', '9988776655')
             ->set('candidateSearchInputs.savings_alt_account_no', '99.887.76655')
             ->call('lookupCandidates')
-            ->assertSet('candidateResults.0.source_key', 'SAVINGS-ALT-1')
+            ->assertSet('candidateResults.0.source_key', '001000000000001')
             ->call('applyCandidate', 0)
             ->assertSet("referenceInputs.{$cifField->id}", '00100055555')
             ->assertSet("referenceInputs.{$primaryField->id}", '001000000000001')
@@ -411,15 +407,13 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'is_active' => true,
         ]);
 
-        DB::connection('dwh')->table('raw_loans')->insert([
-            '_row_key' => 'LOAN-ALT-1',
-            'as_of_date' => '2026-04-12',
-            'locationid' => '001',
-            'nocif' => '00100055555',
-            'id' => '1234567890123456',
-            'noalt' => '1234567890',
-            'noperjanjiankredit' => 'PK20261234',
-            'status_dokumen' => 'Active',
+        DB::connection('dwh')->table('fincloud_loan_details')->insert([
+            'location_id' => '001',
+            'cif_no' => '00100055555',
+            'account_no' => '1234567890123456',
+            'alt_no' => '1234567890',
+            'loan_agreement_no' => 'PK20261234',
+            'document_status' => 'Active',
         ]);
 
         $archive = Archive::query()->create([
@@ -441,7 +435,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertDontSee('Nomor Perjanjian Kredit')
             ->set('candidateSearchInputs.loan_alt_account_no', '12.345.67890')
             ->call('lookupCandidates')
-            ->assertSet('candidateResults.0.source_key', 'LOAN-ALT-1')
+            ->assertSet('candidateResults.0.source_key', '1234567890123456')
             ->call('applyCandidate', 0)
             ->assertSet("referenceInputs.{$primaryField->id}", '1234567890123456');
     }
@@ -773,13 +767,11 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'is_active' => true,
         ]);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            '_row_key' => 'ROW-CTX-1',
-            'as_of_date' => '2026-04-10',
-            'locationid' => '001',
-            'nocif' => '00100013785',
-            'norekening' => '001000000000001',
-            'status_dokumen' => 'Active',
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            'location_id' => '001',
+            'cif_no' => '00100013785',
+            'account_no' => '001000000000001',
+            'document_status' => 'Active',
         ]);
 
         $archive = Archive::query()->create([

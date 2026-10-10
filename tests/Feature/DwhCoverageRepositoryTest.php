@@ -25,9 +25,9 @@ class DwhCoverageRepositoryTest extends TestCase
         parent::setUp();
 
         $this->setUpDwhConnection();
-        $this->createRawSavingsTable();
-        $this->createRawLoansTable();
-        $this->createRawTimeDepositsTable();
+        $this->createSavingDetailsTable();
+        $this->createLoanDetailsTable();
+        $this->createTimeDepositDetailsTable();
     }
 
     public function test_reconciliation_counts_distinct_covered_records_and_includes_all_current_state_rows(): void
@@ -66,11 +66,11 @@ class DwhCoverageRepositoryTest extends TestCase
             'is_active' => true,
         ]);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            ['_row_key' => 'A', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000001', 'norekening' => '001000000000001', 'status_dokumen' => 'Active'],
-            ['_row_key' => 'B', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000002', 'norekening' => '001000000000002', 'status_dokumen' => 'Active'],
-            ['_row_key' => 'C', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000003', 'norekening' => '001000000000003', 'status_dokumen' => 'Closed'],
-            ['_row_key' => 'D', 'as_of_date' => '2026-04-10', 'locationid' => '000', 'nocif' => '00100000004', 'norekening' => '000000OPER', 'status_dokumen' => 'Active'],
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            ['location_id' => '001', 'cif_no' => '00100000001', 'account_no' => '001000000000001', 'document_status' => 'Active'],
+            ['location_id' => '001', 'cif_no' => '00100000002', 'account_no' => '001000000000002', 'document_status' => 'Active'],
+            ['location_id' => '001', 'cif_no' => '00100000003', 'account_no' => '001000000000003', 'document_status' => 'Closed'],
+            ['location_id' => '000', 'cif_no' => '00100000004', 'account_no' => '000000OPER', 'document_status' => 'Active'],
         ]);
 
         $archiveOne = Archive::query()->create([
@@ -162,9 +162,11 @@ class DwhCoverageRepositoryTest extends TestCase
             'is_active' => true,
         ]);
 
-        DB::connection('dwh')->table('raw_time_deposits')->insert([
-            ['_row_key' => 'DEP-1', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000001', 'nobilyet' => 'BILYET-001', 'status_dokumen' => 'Sudah Dicairkan'],
-            ['_row_key' => 'DEP-2', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100000002', 'nobilyet' => 'BILYET-002', 'status_dokumen' => 'Active'],
+        DB::connection('dwh')->table('fincloud_time_deposit_details')->insert([
+            ['account_no' => '001300000000001', 'location_id' => '001', 'cif_no' => '00100000001', 'certificate_no' => 'BILYET-001', 'document_status' => 'Sudah Dicairkan'],
+            ['account_no' => '001300000000002', 'location_id' => '001', 'cif_no' => '00100000002', 'certificate_no' => 'BILYET-002', 'document_status' => 'Active'],
+            ['account_no' => '001300000000003', 'location_id' => '001', 'cif_no' => '00100000003', 'certificate_no' => null, 'document_status' => 'Active'],
+            ['account_no' => '001300000000004', 'location_id' => '001', 'cif_no' => '00100000003', 'certificate_no' => '   ', 'document_status' => 'Active'],
         ]);
 
         $archive = Archive::query()->create([
@@ -194,6 +196,20 @@ class DwhCoverageRepositoryTest extends TestCase
         $this->assertSame(2, $summary['target_count']);
         $this->assertSame(1, $summary['realized_count']);
         $this->assertSame(1, $summary['missing_count']);
+
+        $missing = app(DwhCoverageRepository::class)->getMissingRecords($category->id, $branch->id);
+
+        $this->assertCount(1, $missing);
+        $this->assertSame('BILYET-002', $missing->first()['business_key']);
+        $this->assertSame('001300000000002', $missing->first()['source_key']);
+
+        $repository = app(DwhCoverageRepository::class);
+
+        $this->assertSame(
+            '001300000000001',
+            $repository->searchReferenceCandidates($category, '001', ['deposito_bilyet_no' => 'bilyet-001'])->first()['source_key'],
+        );
+        $this->assertTrue($repository->searchReferenceCandidates($category, '001', ['cif' => '00100000003'])->isEmpty());
     }
 
     public function test_search_reference_candidates_returns_exact_matches_with_reference_payload(): void
@@ -227,9 +243,9 @@ class DwhCoverageRepositoryTest extends TestCase
             'dwh_entity' => 'savings',
         ]);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            ['_row_key' => 'ROW-1', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100013785', 'norekening' => '001000000000001', 'status_dokumen' => 'Active'],
-            ['_row_key' => 'ROW-2', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100099999', 'norekening' => '001000000000999', 'status_dokumen' => 'Active'],
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            ['location_id' => '001', 'cif_no' => '00100013785', 'account_no' => '001000000000001', 'document_status' => 'Active'],
+            ['location_id' => '001', 'cif_no' => '00100099999', 'account_no' => '001000000000999', 'document_status' => 'Active'],
         ]);
 
         $candidates = app(DwhCoverageRepository::class)->searchReferenceCandidates(
@@ -242,7 +258,7 @@ class DwhCoverageRepositoryTest extends TestCase
         );
 
         $this->assertCount(1, $candidates);
-        $this->assertSame('ROW-1', $candidates->first()['source_key']);
+        $this->assertSame('001000000000001', $candidates->first()['source_key']);
         $this->assertSame('00100013785', $candidates->first()['reference_values']['cif']);
         $this->assertSame('001000000000001', $candidates->first()['reference_values']['savings_account_no']);
     }
@@ -278,15 +294,13 @@ class DwhCoverageRepositoryTest extends TestCase
             'dwh_entity' => 'savings',
         ]);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
             [
-                '_row_key' => 'SAVINGS-ALT-1',
-                'as_of_date' => '2026-04-12',
-                'locationid' => '001',
-                'nocif' => '00100077777',
-                'norekening' => '001000000000001',
-                'noalt' => '9988776655',
-                'status_dokumen' => 'Active',
+                'location_id' => '001',
+                'cif_no' => '00100077777',
+                'account_no' => '001000000000001',
+                'alt_no' => '9988776655',
+                'document_status' => 'Active',
             ],
         ]);
 
@@ -299,7 +313,7 @@ class DwhCoverageRepositoryTest extends TestCase
         );
 
         $this->assertCount(1, $candidates);
-        $this->assertSame('SAVINGS-ALT-1', $candidates->first()['source_key']);
+        $this->assertSame('001000000000001', $candidates->first()['source_key']);
         $this->assertSame('9988776655', $candidates->first()['reference_values']['savings_alt_account_no']);
         $this->assertSame('001000000000001', $candidates->first()['reference_values']['savings_account_no']);
     }
@@ -335,16 +349,14 @@ class DwhCoverageRepositoryTest extends TestCase
             'dwh_entity' => 'loans',
         ]);
 
-        DB::connection('dwh')->table('raw_loans')->insert([
+        DB::connection('dwh')->table('fincloud_loan_details')->insert([
             [
-                '_row_key' => 'LOAN-1',
-                'as_of_date' => '2026-04-12',
-                'locationid' => '001',
-                'nocif' => '00100077777',
-                'id' => '1234567890123456',
-                'noalt' => '1234567890',
-                'noperjanjiankredit' => 'PK20260001',
-                'status_dokumen' => 'Active',
+                'location_id' => '001',
+                'cif_no' => '00100077777',
+                'account_no' => '1234567890123456',
+                'alt_no' => '1234567890',
+                'loan_agreement_no' => 'PK20260001',
+                'document_status' => 'Active',
             ],
         ]);
 
@@ -357,7 +369,7 @@ class DwhCoverageRepositoryTest extends TestCase
         );
 
         $this->assertCount(1, $candidates);
-        $this->assertSame('LOAN-1', $candidates->first()['source_key']);
+        $this->assertSame('1234567890123456', $candidates->first()['source_key']);
         $this->assertSame('1234567890', $candidates->first()['reference_values']['loan_alt_account_no']);
         $this->assertSame('1234567890123456', $candidates->first()['reference_values']['loan_account_no']);
         $this->assertArrayNotHasKey('loan_contract_no', $candidates->first()['reference_values']);

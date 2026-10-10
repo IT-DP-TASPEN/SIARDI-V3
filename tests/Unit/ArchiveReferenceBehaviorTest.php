@@ -25,7 +25,7 @@ class ArchiveReferenceBehaviorTest extends TestCase
         parent::setUp();
 
         $this->setUpDwhConnection();
-        $this->createRawSavingsTable();
+        $this->createSavingDetailsTable();
     }
 
     public function test_dynamic_category_reference_schema_is_configuration_driven(): void
@@ -154,13 +154,11 @@ class ArchiveReferenceBehaviorTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            '_row_key' => 'ROW-1',
-            'as_of_date' => '2026-04-10',
-            'locationid' => '001',
-            'nocif' => '00100013785',
-            'norekening' => '001000000000001',
-            'status_dokumen' => 'Active',
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            'location_id' => '001',
+            'cif_no' => '00100013785',
+            'account_no' => '001000000000001',
+            'document_status' => 'Active',
         ]);
 
         $archive = Archive::query()->create([
@@ -181,8 +179,8 @@ class ArchiveReferenceBehaviorTest extends TestCase
         $reference = $archive->businessReferences()->firstOrFail();
 
         $this->assertSame('001000000000001', $reference->normalized_value);
-        $this->assertSame('raw_savings', $reference->matched_table);
-        $this->assertSame('ROW-1', $reference->matched_source_key);
+        $this->assertSame('fincloud_saving_details', $reference->matched_table);
+        $this->assertSame('001000000000001', $reference->matched_source_key);
     }
 
     public function test_linkage_status_reports_configuration_gap_for_supported_category_without_fields(): void

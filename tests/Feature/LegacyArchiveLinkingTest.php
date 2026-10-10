@@ -25,7 +25,7 @@ class LegacyArchiveLinkingTest extends TestCase
         parent::setUp();
 
         $this->setUpDwhConnection();
-        $this->createRawSavingsTable();
+        $this->createSavingDetailsTable();
     }
 
     public function test_manual_linking_updates_realized_coverage(): void
@@ -76,8 +76,8 @@ class LegacyArchiveLinkingTest extends TestCase
             'is_active' => true,
         ]);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            ['_row_key' => 'A', 'as_of_date' => '2026-04-10', 'locationid' => '001', 'nocif' => '00100013785', 'norekening' => '001000000000001', 'status_dokumen' => 'Active'],
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            ['location_id' => '001', 'cif_no' => '00100013785', 'account_no' => '001000000000001', 'document_status' => 'Active'],
         ]);
 
         $archive = Archive::query()->create([

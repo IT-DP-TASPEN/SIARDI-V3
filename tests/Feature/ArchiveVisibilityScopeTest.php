@@ -23,8 +23,8 @@ class ArchiveVisibilityScopeTest extends TestCase
         parent::setUp();
 
         $this->setUpDwhConnection();
-        $this->createRawSavingsTable();
-        $this->createRawLoansTable();
+        $this->createSavingDetailsTable();
+        $this->createLoanDetailsTable();
     }
 
     public function test_non_head_office_kearsipan_archive_surfaces_are_scoped_to_own_branch_and_allowed_categories(): void
@@ -129,9 +129,9 @@ class ArchiveVisibilityScopeTest extends TestCase
         $this->assignRole($user, 'super_admin');
         $user->permittedCategories()->attach($tabungan->id);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            ['_row_key' => 'A1', 'as_of_date' => '2026-04-12', 'locationid' => '001', 'nocif' => '00100000001', 'norekening' => '001000000000001', 'status_dokumen' => 'Active'],
-            ['_row_key' => 'B1', 'as_of_date' => '2026-04-12', 'locationid' => '002', 'nocif' => '00200000001', 'norekening' => '002000000000001', 'status_dokumen' => 'Active'],
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            ['location_id' => '001', 'cif_no' => '00100000001', 'account_no' => '001000000000001', 'document_status' => 'Active'],
+            ['location_id' => '002', 'cif_no' => '00200000001', 'account_no' => '002000000000001', 'document_status' => 'Active'],
         ]);
 
         $this->actingAs($user)

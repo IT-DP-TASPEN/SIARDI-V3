@@ -26,8 +26,8 @@ class ArchiveReferenceRematchTest extends TestCase
         parent::setUp();
 
         $this->setUpDwhConnection();
-        $this->createRawSavingsTable();
-        $this->createRawLoansTable();
+        $this->createSavingDetailsTable();
+        $this->createLoanDetailsTable();
     }
 
     public function test_rematch_archive_updates_previous_unmatched_reference_after_target_row_arrives(): void
@@ -42,13 +42,11 @@ class ArchiveReferenceRematchTest extends TestCase
 
         $this->assertNull($reference->matched_source_key);
 
-        DB::connection('dwh')->table('raw_savings')->insert([
-            '_row_key' => 'ROW-HPLUS1',
-            'as_of_date' => '2026-04-13',
-            'locationid' => '001',
-            'nocif' => '00100013785',
-            'norekening' => '001000000000001',
-            'status_dokumen' => 'Active',
+        DB::connection('dwh')->table('fincloud_saving_details')->insert([
+            'location_id' => '001',
+            'cif_no' => '00100013785',
+            'account_no' => '001000000000001',
+            'document_status' => 'Active',
         ]);
 
         $result = app(ArchiveBusinessReferenceService::class)->rematchArchive($archive->fresh());
@@ -56,14 +54,36 @@ class ArchiveReferenceRematchTest extends TestCase
         $reference->refresh();
 
         $this->assertSame(1, $result['updated_references']);
-        $this->assertSame('raw_savings', $reference->matched_table);
-        $this->assertSame('ROW-HPLUS1', $reference->matched_source_key);
+        $this->assertSame('fincloud_saving_details', $reference->matched_table);
+        $this->assertSame('001000000000001', $reference->matched_source_key);
+    }
+
+    public function test_forced_rematch_command_replaces_legacy_row_key_with_native_source_key(): void
+    {
+        [$archive, $field] = $this->createSavingsArchiveContext(withDwhRow: true);
+
+        app(ArchiveBusinessReferenceService::class)->syncForArchive($archive, [
+            $field->id => '001000000000001',
+        ]);
+
+        $reference = $archive->businessReferences()->firstOrFail();
+        $reference->forceFill(['matched_table' => 'raw_savings', 'matched_source_key' => 'LEGACY-ROW-KEY'])->save();
+
+        $this->artisan('siardi:rematch-references', ['--force' => true])
+            ->expectsOutput('Queued 1 rematch job(s).')
+            ->assertSuccessful();
+
+        $reference->refresh();
+
+        $this->assertSame('fincloud_saving_details', $reference->matched_table);
+        $this->assertSame('001000000000001', $reference->matched_source_key);
+        $this->assertSame('001000000000001', $reference->normalized_value);
     }
 
     public function test_rematch_command_dispatches_jobs_only_for_unmatched_backlog_by_default(): void
     {
         [$archiveOne, $field] = $this->createSavingsArchiveContext();
-        [$archiveTwo] = $this->createSavingsArchiveContext('001000000000002', 'ROW-MATCHED');
+        [$archiveTwo] = $this->createSavingsArchiveContext('001000000000002', true);
 
         app(ArchiveBusinessReferenceService::class)->syncForArchive($archiveOne, [
             $field->id => '001000000000001',
@@ -87,7 +107,7 @@ class ArchiveReferenceRematchTest extends TestCase
     {
         [$archive, $field] = $this->createSavingsArchiveContext(
             accountNo: '001000000000001',
-            existingRowKey: 'ROW-SAVINGS-ALT-1',
+            withDwhRow: true,
             alternateAccountNo: '9988776655',
         );
 
@@ -108,15 +128,15 @@ class ArchiveReferenceRematchTest extends TestCase
         $this->assertSame(1, $result['updated_references']);
         $this->assertSame('001000000000001', $reference->raw_value);
         $this->assertSame('001000000000001', $reference->normalized_value);
-        $this->assertSame('raw_savings', $reference->matched_table);
-        $this->assertSame('ROW-SAVINGS-ALT-1', $reference->matched_source_key);
+        $this->assertSame('fincloud_saving_details', $reference->matched_table);
+        $this->assertSame('001000000000001', $reference->matched_source_key);
     }
 
     public function test_rematch_archive_canonicalizes_kredit_alt_account_number_to_main_account(): void
     {
         [$archive, $field] = $this->createLoanArchiveContext(
             accountNo: '1234567890123456',
-            existingRowKey: 'LOAN-ALT-1',
+            withDwhRow: true,
             alternateAccountNo: '1234567890',
         );
 
@@ -137,8 +157,8 @@ class ArchiveReferenceRematchTest extends TestCase
         $this->assertSame(1, $result['updated_references']);
         $this->assertSame('1234567890123456', $reference->raw_value);
         $this->assertSame('1234567890123456', $reference->normalized_value);
-        $this->assertSame('raw_loans', $reference->matched_table);
-        $this->assertSame('LOAN-ALT-1', $reference->matched_source_key);
+        $this->assertSame('fincloud_loan_details', $reference->matched_table);
+        $this->assertSame('1234567890123456', $reference->matched_source_key);
     }
 
     public function test_rematch_archive_keeps_alt_account_number_unchanged_when_no_canonical_row_exists(): void
@@ -169,7 +189,7 @@ class ArchiveReferenceRematchTest extends TestCase
      */
     private function createSavingsArchiveContext(
         string $accountNo = '001000000000001',
-        ?string $existingRowKey = null,
+        bool $withDwhRow = false,
         ?string $alternateAccountNo = null,
     ): array {
         $category = Category::query()->firstOrCreate(
@@ -212,15 +232,13 @@ class ArchiveReferenceRematchTest extends TestCase
             ],
         );
 
-        if ($existingRowKey) {
-            DB::connection('dwh')->table('raw_savings')->insert([
-                '_row_key' => $existingRowKey,
-                'as_of_date' => '2026-04-12',
-                'locationid' => '001',
-                'nocif' => '00100013786',
-                'norekening' => $accountNo,
-                'noalt' => $alternateAccountNo,
-                'status_dokumen' => 'Active',
+        if ($withDwhRow) {
+            DB::connection('dwh')->table('fincloud_saving_details')->insert([
+                'location_id' => '001',
+                'cif_no' => '00100013786',
+                'account_no' => $accountNo,
+                'alt_no' => $alternateAccountNo,
+                'document_status' => 'Active',
             ]);
         }
 
@@ -243,7 +261,7 @@ class ArchiveReferenceRematchTest extends TestCase
      */
     private function createLoanArchiveContext(
         string $accountNo = '1234567890123456',
-        ?string $existingRowKey = null,
+        bool $withDwhRow = false,
         ?string $alternateAccountNo = null,
     ): array {
         $category = Category::query()->firstOrCreate(
@@ -286,16 +304,14 @@ class ArchiveReferenceRematchTest extends TestCase
             ],
         );
 
-        if ($existingRowKey) {
-            DB::connection('dwh')->table('raw_loans')->insert([
-                '_row_key' => $existingRowKey,
-                'as_of_date' => '2026-04-12',
-                'locationid' => '001',
-                'nocif' => '00100013786',
-                'id' => $accountNo,
-                'noalt' => $alternateAccountNo,
-                'noperjanjiankredit' => 'PK20260001',
-                'status_dokumen' => 'Active',
+        if ($withDwhRow) {
+            DB::connection('dwh')->table('fincloud_loan_details')->insert([
+                'location_id' => '001',
+                'cif_no' => '00100013786',
+                'account_no' => $accountNo,
+                'alt_no' => $alternateAccountNo,
+                'loan_agreement_no' => 'PK20260001',
+                'document_status' => 'Active',
             ]);
         }
 

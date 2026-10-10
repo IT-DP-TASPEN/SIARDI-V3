@@ -11,11 +11,11 @@ Audit date: 2026-04-11
   - category IDs are not sequential and include large IDs, so category logic must not hardcode IDs.
   - archive data quality is mixed, including blank `archive_code` values and malformed `archive_date` values.
 - The legacy recap feature is file-count based and hardcodes category IDs. That is not sufficient for DWH reconciliation because file count is not the same as covered business entities.
-- DWH inspection confirmed category-specific keys and branch columns:
-  - `raw_savings`: business key `norekening`, CIF `nocif`, branch `locationid`
-  - `raw_loans`: business key `id`, CIF `nocif`, branch `locationid`
-  - `raw_time_deposits`: business key `nobilyet`, CIF `nocif`, branch `locationid`
-- The DWH mirror tables expose an `as_of_date` column, but the application now treats `raw_savings`, `raw_loans`, and `raw_time_deposits` as current-state daily upsert sources rather than user-selectable snapshot-history sources.
+- SIARDI reads the native `dwh-v2` current-state detail tables (no `as_of_date`, no `_row_key`):
+  - `fincloud_saving_details`: business key `account_no` (alt `alt_no`), CIF `cif_no`, branch `location_id`, source key `account_no`
+  - `fincloud_loan_details`: business key `account_no` (alt `alt_no`), CIF `cif_no`, branch `location_id`, source key `account_no`
+  - `fincloud_time_deposit_details`: business key `certificate_no`, CIF `cif_no`, branch `location_id`, source key `account_no`; rows with null/blank `certificate_no` are not targets
+- `document_status` is informational only; closed / `Sudah Dicairkan` rows remain targets.
 
 ## Extension Design
 
@@ -60,9 +60,9 @@ Audit date: 2026-04-11
 ## Matching Rules
 
 - Matching is category-specific:
-  - `TABUNGAN` -> `raw_savings`
-  - `KREDIT` -> `raw_loans`
-  - `BILYET DEPOSITO` -> `raw_time_deposits`
+  - `TABUNGAN` -> `fincloud_saving_details`
+  - `KREDIT` -> `fincloud_loan_details`
+  - `BILYET DEPOSITO` -> `fincloud_time_deposit_details`
 - The primary realized-count key is:
   - `savings_account_no` for tabungan
   - `loan_account_no` for kredit

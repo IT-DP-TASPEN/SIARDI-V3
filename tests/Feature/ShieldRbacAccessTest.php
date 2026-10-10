@@ -22,7 +22,7 @@ class ShieldRbacAccessTest extends TestCase
         parent::setUp();
 
         $this->setUpDwhConnection();
-        $this->createRawSavingsTable();
+        $this->createSavingDetailsTable();
     }
 
     public function test_staff_dashboard_hides_dwh_widgets_and_staff_cannot_access_guarded_pages(): void
