@@ -53,6 +53,11 @@ return [
             'driver' => 'local',
             'root' => env('ARCHIVE_STORAGE_ROOT', storage_path('app/private/archives')),
             'visibility' => 'private',
+            // Group/ACL-readable (not world): CLI (deploy user) and php-fpm (www-data) both need access.
+            'permissions' => [
+                'file' => ['public' => 0664, 'private' => 0660],
+                'dir' => ['public' => 0775, 'private' => 0770],
+            ],
             'throw' => true,
             'report' => true,
         ],
