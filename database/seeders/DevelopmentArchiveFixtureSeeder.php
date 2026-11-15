@@ -7,6 +7,7 @@ use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\User;
 use App\Services\ArchiveBusinessReferenceService;
+use App\Services\ArchiveFileService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -86,7 +87,7 @@ class DevelopmentArchiveFixtureSeeder extends Seeder
                 continue;
             }
 
-            Storage::disk('public')->put(
+            Storage::disk(ArchiveFileService::DISK)->put(
                 $definition['archive_path'],
                 implode(PHP_EOL, [
                     'SIARDI development fixture',
@@ -103,6 +104,7 @@ class DevelopmentArchiveFixtureSeeder extends Seeder
                     'archive_name' => $definition['archive_name'],
                     'archive_description' => $definition['archive_description'],
                     'archive_path' => $definition['archive_path'],
+                    'archive_disk' => ArchiveFileService::DISK,
                     'archive_type' => $definition['archive_type'],
                     'archive_branch_office' => $branchOffice->id,
                     'archive_date' => $definition['archive_date'],

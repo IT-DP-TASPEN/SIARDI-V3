@@ -469,6 +469,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'archive_code' => 'TXT-001',
             'archive_description' => 'Preview file',
             'archive_path' => 'archives/preview.txt',
+            'archive_disk' => 'public',
             'archive_type' => 'txt',
             'archive_branch_office' => $branch->id,
             'archive_date' => '2026-04-12',
@@ -481,7 +482,8 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertSee('Isi preview legacy')
             ->assertSee('items-start', false)
             ->assertSee('gap-y-8', false)
-            ->assertSee('/storage/archives/preview.txt', false);
+            ->assertSee(route('archives.file.show', $archive), false)
+            ->assertDontSee('/storage/archives/preview.txt', false);
     }
 
     public function test_linking_modal_shows_pdfjs_preview_shell_for_pdf_files(): void
@@ -513,6 +515,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'archive_code' => 'PDF-LEG-001',
             'archive_description' => 'Preview file',
             'archive_path' => 'archives/modal-preview.pdf',
+            'archive_disk' => 'public',
             'archive_type' => 'pdf',
             'archive_branch_office' => $branch->id,
             'archive_date' => '2026-04-12',
@@ -524,7 +527,8 @@ class LegacyArchiveLinkerPageTest extends TestCase
             ->assertSee('Preview Arsip')
             ->assertSee('data-siardi-pdf-preview', false)
             ->assertSee('data-role="canvas"', false)
-            ->assertSee('/storage/archives/modal-preview.pdf', false)
+            ->assertSee(route('archives.file.show', $archive), false)
+            ->assertDontSee('/storage/archives/modal-preview.pdf', false)
             ->assertSee('Fit Width');
     }
 
@@ -661,7 +665,7 @@ class LegacyArchiveLinkerPageTest extends TestCase
 
     public function test_preview_renderer_returns_pdfjs_markup_for_pdf_and_storage_url_for_others(): void
     {
-        Storage::fake('public');
+        Storage::fake('archives');
 
         $category = Category::query()->create([
             'category_name' => 'TABUNGAN',
@@ -701,8 +705,8 @@ class LegacyArchiveLinkerPageTest extends TestCase
             'archive_date' => '2026-04-12',
         ]);
 
-        Storage::disk('public')->put($pdfArchive->archive_path, '%PDF-1.4 preview');
-        Storage::disk('public')->put($docArchive->archive_path, 'docx binary');
+        Storage::disk('archives')->put($pdfArchive->archive_path, '%PDF-1.4 preview');
+        Storage::disk('archives')->put($docArchive->archive_path, 'docx binary');
 
         $pdfHtml = ArchivePreviewRenderer::render($pdfArchive)->toHtml();
         $docHtml = ArchivePreviewRenderer::render($docArchive)->toHtml();
@@ -710,8 +714,9 @@ class LegacyArchiveLinkerPageTest extends TestCase
         $this->assertStringContainsString('data-siardi-pdf-preview', $pdfHtml);
         $this->assertStringContainsString('data-role="canvas"', $pdfHtml);
         $this->assertStringContainsString('Fit Width', $pdfHtml);
-        $this->assertStringContainsString('/storage/archives/preview.pdf', $pdfHtml);
-        $this->assertStringContainsString('/storage/archives/preview.docx', $docHtml);
+        $this->assertStringContainsString(route('archives.file.show', $pdfArchive), $pdfHtml);
+        $this->assertStringContainsString(route('archives.file.download', $docArchive), $docHtml);
+        $this->assertStringNotContainsString('/storage/', $pdfHtml.$docHtml);
     }
 
     /**

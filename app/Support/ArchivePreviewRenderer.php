@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Models\Archive;
-use Illuminate\Support\Facades\Storage;
+use App\Services\ArchiveFileService;
 use Illuminate\Support\HtmlString;
 
 class ArchivePreviewRenderer
@@ -12,21 +12,20 @@ class ArchivePreviewRenderer
 
     public static function render(Archive $archive, string $height = '70vh'): HtmlString
     {
-        if (! filled($archive->archive_path)) {
-            return new HtmlString('<span class="text-sm text-gray-500">File arsip tidak tersedia.</span>');
+        $files = app(ArchiveFileService::class);
+
+        if (! $files->exists($archive)) {
+            $code = $files->logFailure('preview', 'Archive file is missing from storage.', $archive, level: 'warning');
+
+            return new HtmlString('<span class="text-sm text-gray-500">File arsip tidak tersedia. Kode: '.e($code).'</span>');
         }
 
-        $disk = Storage::disk('public');
-
-        if (! $disk->exists($archive->archive_path)) {
-            return new HtmlString('<span class="text-sm text-gray-500">File arsip tidak tersedia.</span>');
-        }
-
-        $url = e($disk->url($archive->archive_path));
-        $extension = static::extension($archive);
+        $url = e(route('archives.file.show', $archive));
+        $downloadUrl = e(route('archives.file.download', $archive));
+        $extension = $files->extension($archive);
 
         if ($extension === 'pdf') {
-            return static::renderPdfPreview($url, e(basename((string) $archive->archive_path)), $height);
+            return static::renderPdfPreview($url, e($files->displayName($archive)), $height);
         }
 
         if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
@@ -54,20 +53,21 @@ class ArchivePreviewRenderer
         }
 
         if (in_array($extension, ['txt', 'text'], true)) {
-            return static::renderTextPreview($archive->archive_path, $url, $height);
+            return static::renderTextPreview($archive, $url, $downloadUrl, $height);
         }
 
-        return new HtmlString("<a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"siardi-preview-link\">Buka / Download Arsip</a>");
+        return new HtmlString("<a href=\"{$downloadUrl}\" class=\"siardi-preview-link\">Download Arsip</a>");
     }
 
-    private static function renderTextPreview(string $path, string $url, string $height): HtmlString
+    private static function renderTextPreview(Archive $archive, string $url, string $downloadUrl, string $height): HtmlString
     {
-        $disk = Storage::disk('public');
+        $disk = app(ArchiveFileService::class)->disk($archive);
+        $path = $archive->archive_path;
 
         try {
             if ($disk->size($path) > self::TEXT_PREVIEW_MAX_BYTES) {
                 return new HtmlString(
-                    "<div class=\"siardi-preview-stack\"><p class=\"text-sm text-gray-500\">Preview teks dibatasi karena file terlalu besar.</p><a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"siardi-preview-link\">Buka / Download Arsip</a></div>",
+                    "<div class=\"siardi-preview-stack\"><p class=\"text-sm text-gray-500\">Preview teks dibatasi karena file terlalu besar.</p><a href=\"{$downloadUrl}\" class=\"siardi-preview-link\">Download Arsip</a></div>",
                 );
             }
 
@@ -81,8 +81,10 @@ class ArchivePreviewRenderer
                 </div>
                 HTML,
             );
-        } catch (\Throwable) {
-            return new HtmlString("<a href=\"{$url}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"siardi-preview-link\">Buka / Download Arsip</a>");
+        } catch (\Throwable $exception) {
+            app(ArchiveFileService::class)->logFailure('preview', $exception, $archive);
+
+            return new HtmlString("<a href=\"{$downloadUrl}\" class=\"siardi-preview-link\">Download Arsip</a>");
         }
     }
 
@@ -123,16 +125,5 @@ class ArchivePreviewRenderer
             </div>
             HTML,
         );
-    }
-
-    private static function extension(Archive $archive): string
-    {
-        $extension = strtolower((string) $archive->archive_type);
-
-        if ($extension !== '') {
-            return ltrim($extension, '.');
-        }
-
-        return strtolower((string) pathinfo((string) $archive->archive_path, PATHINFO_EXTENSION));
     }
 }

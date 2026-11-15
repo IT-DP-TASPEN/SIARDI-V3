@@ -18,6 +18,8 @@ class Archive extends Model
         'archive_code',
         'archive_description',
         'archive_path',
+        'archive_original_name',
+        'archive_disk',
         'archive_type',
         'archive_branch_office',
         'archive_date',

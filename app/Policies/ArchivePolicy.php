@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Archive;
 use App\Models\User;
+use App\Services\ArchiveVisibilityService;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ArchivePolicy
@@ -17,7 +18,7 @@ class ArchivePolicy
 
     public function view(User $user, Archive $archive): bool
     {
-        return $user->can('view_archive');
+        return $user->can('view_archive') && $this->isVisible($user, $archive);
     }
 
     public function create(User $user): bool
@@ -27,12 +28,12 @@ class ArchivePolicy
 
     public function update(User $user, Archive $archive): bool
     {
-        return $user->can('update_archive');
+        return $user->can('update_archive') && $this->isVisible($user, $archive);
     }
 
     public function delete(User $user, Archive $archive): bool
     {
-        return $user->can('delete_archive');
+        return $user->can('delete_archive') && $this->isVisible($user, $archive);
     }
 
     public function deleteAny(User $user): bool
@@ -68,5 +69,14 @@ class ArchivePolicy
     public function forceDeleteAny(User $user): bool
     {
         return $user->can('force_delete_any_archive');
+    }
+
+    /**
+     * Row-level SIARDI scope (category + branch). Note: Shield's super_admin Gate::before
+     * bypasses policies, so file endpoints must also check ArchiveVisibilityService directly.
+     */
+    private function isVisible(User $user, Archive $archive): bool
+    {
+        return app(ArchiveVisibilityService::class)->canViewArchive($user, $archive);
     }
 }

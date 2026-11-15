@@ -9,6 +9,7 @@ use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\CategoryReferenceField;
 use App\Services\ArchiveBusinessReferenceService;
+use App\Services\ArchiveFileService;
 use App\Services\ArchiveVisibilityService;
 use App\Support\ArchivePreviewRenderer;
 use App\Support\ReferenceNormalizer;
@@ -19,6 +20,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms;
+use Filament\Forms\Components\BaseFileUpload;
 use Filament\Forms\Components\Component;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
@@ -34,6 +36,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class ArchiveResource extends Resource
 {
@@ -87,9 +90,16 @@ class ArchiveResource extends Resource
                     ->compact(),
                 Forms\Components\FileUpload::make('archive_path')
                     ->label('File Arsip')
-                    ->disk('public')
-                    ->directory('archives')
-                    ->preserveFilenames()
+                    ->disk(ArchiveFileService::DISK)
+                    ->visibility('private')
+                    ->storeFileNamesIn('archive_original_name')
+                    ->fetchFileInformation(false)
+                    ->saveUploadedFileUsing(fn (BaseFileUpload $component, TemporaryUploadedFile $file, ?Archive $record): string => app(ArchiveFileService::class)
+                        ->storeUpload($file, $record ? 'replace' : 'create', $component->getStatePath(), $record))
+                    ->getUploadedFileUsing(fn (string $file, ?Archive $record): ?array => static::uploadedFileInfo($file, $record))
+                    ->validationMessages([
+                        'required' => 'File Arsip wajib diunggah. Jika upload sebelumnya gagal, hapus file tersebut lalu unggah kembali.',
+                    ])
                     ->acceptedFileTypes([
                         'application/pdf',
                         'image/jpeg',
@@ -221,7 +231,19 @@ class ArchiveResource extends Resource
             ])
             ->bulkActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->using(function (DeleteBulkAction $action, Collection $records): void {
+                            $files = app(ArchiveFileService::class);
+
+                            $records->each(function (Archive $record) use ($action, $files): void {
+                                try {
+                                    $files->deleteArchive($record) || $action->reportBulkProcessingFailure();
+                                } catch (\Throwable $exception) {
+                                    $action->reportBulkProcessingFailure();
+                                    report($exception);
+                                }
+                            });
+                        }),
                 ]),
             ])
             ->recordUrl(fn (Archive $record): string => static::getUrl('view', ['record' => $record]))
@@ -467,6 +489,62 @@ class ArchiveResource extends Resource
                 "<ul class=\"list-disc pl-4\">{$items}</ul>".
                 '</div>',
         );
+    }
+
+    /**
+     * Sync references after the archive is persisted. A DWH outage never undoes the saved
+     * archive/file; references stay unmatched until the scheduled or manual rematch.
+     *
+     * @param  array<int|string, mixed>  $references
+     */
+    public static function syncBusinessReferences(Archive $record, array $references): void
+    {
+        $service = app(ArchiveBusinessReferenceService::class);
+
+        if (! $service->syncForArchive($record, $references)) {
+            Notification::make()
+                ->title('Arsip tersimpan, pencocokan DWH tertunda')
+                ->body('Data DWH sedang tidak dapat diakses. Referensi bisnis tetap tersimpan dan akan dicocokkan ulang otomatis atau melalui tombol Rematch Referensi.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $status = $service->getLinkageStatus($record);
+        $notification = Notification::make()
+            ->title('Status referensi bisnis')
+            ->body($status['description']);
+
+        match ($status['tone']) {
+            'success' => $notification->success(),
+            'warning' => $notification->warning(),
+            'danger' => $notification->danger(),
+            default => $notification->info(),
+        };
+
+        $notification->send();
+    }
+
+    /**
+     * FilePond metadata for an already-stored file, served through the authorized route.
+     *
+     * @return array{name: string, size: int, type: ?string, url: string}|null
+     */
+    private static function uploadedFileInfo(string $file, ?Archive $record): ?array
+    {
+        if (! $record || $record->archive_path !== $file) {
+            return null;
+        }
+
+        $files = app(ArchiveFileService::class);
+
+        return [
+            'name' => $files->displayName($record),
+            'size' => (int) rescue(fn () => $files->disk($record)->size($file), 0, report: false),
+            'type' => $files->inlineMimeType($record),
+            'url' => route('archives.file.show', $record),
+        ];
     }
 
     private static function renderArchivePreviewHtml(Archive $record): HtmlString

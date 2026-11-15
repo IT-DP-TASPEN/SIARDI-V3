@@ -47,6 +47,16 @@ return [
             'report' => false,
         ],
 
+        // Private archive files. Never exposed through public/storage; served only
+        // by ArchiveFileController after SIARDI authorization.
+        'archives' => [
+            'driver' => 'local',
+            'root' => env('ARCHIVE_STORAGE_ROOT', storage_path('app/private/archives')),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => true,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

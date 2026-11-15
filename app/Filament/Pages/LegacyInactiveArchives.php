@@ -172,7 +172,8 @@ class LegacyInactiveArchives extends Page
                     $innerQuery
                         ->where('archive_name', 'like', '%'.$this->search.'%')
                         ->orWhere('archive_code', 'like', '%'.$this->search.'%')
-                        ->orWhere('archive_path', 'like', '%'.$this->search.'%');
+                        ->orWhere('archive_path', 'like', '%'.$this->search.'%')
+                        ->orWhere('archive_original_name', 'like', '%'.$this->search.'%');
                 });
             })
             ->orderByDesc(

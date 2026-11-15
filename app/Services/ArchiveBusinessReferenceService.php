@@ -10,7 +10,9 @@ use App\Repositories\DwhCoverageRepository;
 use App\Support\LegacyReferenceSuggestionParser;
 use App\Support\ReferenceNormalizer;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class ArchiveBusinessReferenceService
 {
@@ -82,10 +84,16 @@ class ArchiveBusinessReferenceService
     }
 
     /**
+     * Persist submitted references and match them against DWH. References are always kept;
+     * when DWH is unavailable they stay unmatched for the scheduled/manual rematch.
+     *
      * @param  array<int|string, mixed>  $submittedReferences
+     * @return bool false when DWH matching could not run
      */
-    public function syncForArchive(Archive $archive, array $submittedReferences): void
+    public function syncForArchive(Archive $archive, array $submittedReferences): bool
     {
+        $dwhAvailable = true;
+
         $fields = $this->getFieldDefinitionsForCategory($archive->archive_category)->keyBy('id');
         $activeFieldIds = $fields->keys()->all();
 
@@ -105,9 +113,26 @@ class ArchiveBusinessReferenceService
             }
 
             $normalizedValue = ReferenceNormalizer::normalize($rawValue, $field->normalizer ?? 'uppercase_compact');
-            $match = $normalizedValue
-                ? $this->dwhCoverageRepository->matchReference($field, $normalizedValue, $archive->branchOffice?->dwhMapping?->dwh_location_code)
-                : null;
+            $match = null;
+
+            if ($normalizedValue && $dwhAvailable) {
+                try {
+                    $match = $this->dwhCoverageRepository->matchReference($field, $normalizedValue, $archive->branchOffice?->dwhMapping?->dwh_location_code);
+                } catch (QueryException $exception) {
+                    // Only DWH outages/query failures are tolerated; local DB errors and bugs still surface.
+                    if ($exception->getConnectionName() !== 'dwh') {
+                        throw $exception;
+                    }
+
+                    $dwhAvailable = false;
+                    Log::warning('DWH reference matching failed; archive saved with unmatched references.', [
+                        'archive_id' => $archive->getKey(),
+                        'reference_type' => $field->reference_type,
+                        'exception_class' => $exception::class,
+                        'exception_message' => $exception->getMessage(),
+                    ]);
+                }
+            }
 
             ArchiveBusinessReference::query()->updateOrCreate(
                 [
@@ -127,6 +152,8 @@ class ArchiveBusinessReferenceService
                 ],
             );
         }
+
+        return $dwhAvailable;
     }
 
     /**

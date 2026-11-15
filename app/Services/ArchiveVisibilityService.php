@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Archive;
 use App\Models\BranchOffice;
 use App\Models\Category;
 use App\Models\User;
@@ -33,6 +34,29 @@ class ArchiveVisibilityService
         }
 
         return $query;
+    }
+
+    /**
+     * Row-level counterpart of applyArchiveScope() for a single loaded archive.
+     */
+    public function canViewArchive(?User $user, Archive $archive): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($this->canViewAllArchives($user)) {
+            return true;
+        }
+
+        $user->loadMissing('permittedCategories');
+
+        if (! $user->permittedCategories->contains('id', $archive->archive_category)) {
+            return false;
+        }
+
+        return $this->canViewAllBranches($user)
+            || ($user->branch_office_id !== null && (int) $archive->archive_branch_office === (int) $user->branch_office_id);
     }
 
     /**

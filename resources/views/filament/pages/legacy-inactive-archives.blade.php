@@ -146,7 +146,7 @@
                                 <div>
                                     <h3 class="text-base font-semibold text-gray-950 dark:text-white">{{ $selectedArchive->archive_name }}</h3>
                                     <p class="break-all text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $selectedArchive->archive_code ?: 'Tanpa kode arsip' }} | {{ $selectedArchive->archive_path }}
+                                        {{ $selectedArchive->archive_code ?: 'Tanpa kode arsip' }} | {{ $selectedArchive->archive_original_name ?: $selectedArchive->archive_path }}
                                     </p>
                                 </div>
 

@@ -14,7 +14,8 @@ class LegacyReferenceSuggestionParser
         $haystack = strtoupper(implode(' ', array_filter([
             $archive->archive_code,
             $archive->archive_name,
-            $archive->archive_path,
+            // Generated storage names (ULIDs) carry no business data; parse the uploaded filename.
+            $archive->archive_original_name ?: $archive->archive_path,
             $archive->archive_description,
         ])));
 

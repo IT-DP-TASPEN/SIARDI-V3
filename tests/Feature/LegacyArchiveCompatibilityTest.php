@@ -133,11 +133,11 @@ class LegacyArchiveCompatibilityTest extends TestCase
 
     public function test_archive_view_uses_pdfjs_preview_shell_for_pdf_files(): void
     {
-        Storage::fake('public');
+        Storage::fake('archives');
 
         [$branch, $category, $user] = $this->createArchiveUserContext();
 
-        Storage::disk('public')->put('archives/view-preview.pdf', '%PDF-1.4 preview');
+        Storage::disk('archives')->put('archives/view-preview.pdf', '%PDF-1.4 preview');
 
         $archive = Archive::query()->create([
             'archive_category' => $category->id,
@@ -157,7 +157,8 @@ class LegacyArchiveCompatibilityTest extends TestCase
             ->assertSee('PDF.js Archive View')
             ->assertSee('data-siardi-pdf-preview', false)
             ->assertSee('data-role="canvas"', false)
-            ->assertSee('/storage/archives/view-preview.pdf', false)
+            ->assertSee(route('archives.file.show', $archive), false)
+            ->assertDontSee('/storage/archives/view-preview.pdf', false)
             ->assertSee('Fit Width');
     }
 

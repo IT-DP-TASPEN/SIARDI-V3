@@ -105,7 +105,7 @@
                                     </td>
                                     <td>{{ $archive->archive_code ?: '-' }}</td>
                                     <td class="font-medium text-gray-950 dark:text-white">{{ $archive->archive_name }}</td>
-                                    <td class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ $archive->archive_path }}</td>
+                                    <td class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ $archive->archive_original_name ?: $archive->archive_path }}</td>
                                     <td class="text-right">
                                         <x-filament::button type="button" color="primary" size="sm" wire:click="selectArchive({{ $archive->id }})">
                                             Link References
@@ -157,7 +157,7 @@
                                     <div>
                                         <h3 class="text-base font-semibold text-gray-950 dark:text-white">{{ $selectedArchive->archive_name }}</h3>
                                         <p class="break-all text-sm text-gray-500 dark:text-gray-400">
-                                            {{ $selectedArchive->archive_code ?: 'Tanpa kode arsip' }} | {{ $selectedArchive->archive_path }}
+                                            {{ $selectedArchive->archive_code ?: 'Tanpa kode arsip' }} | {{ $selectedArchive->archive_original_name ?: $selectedArchive->archive_path }}
                                         </p>
                                     </div>
 

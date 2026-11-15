@@ -59,6 +59,7 @@ class LegacyInactiveArchivesPageTest extends TestCase
             'archive_code' => 'INA-TXT-001',
             'archive_description' => 'Archive',
             'archive_path' => 'archives/inactive-preview.txt',
+            'archive_disk' => 'public',
             'archive_type' => 'txt',
             'archive_branch_office' => $user->branch_office_id,
             'archive_date' => '2026-04-12',
@@ -77,7 +78,7 @@ class LegacyInactiveArchivesPageTest extends TestCase
             ->assertSee('Isi preview inactive')
             ->assertSee('items-start', false)
             ->assertSee('gap-y-8', false)
-            ->assertSee('/storage/archives/inactive-preview.txt', false);
+            ->assertSee(route('archives.file.show', $archive), false);
     }
 
     public function test_inactive_modal_shows_pdfjs_preview_shell_for_pdf_files(): void
@@ -94,6 +95,7 @@ class LegacyInactiveArchivesPageTest extends TestCase
             'archive_code' => 'INA-PDF-001',
             'archive_description' => 'Archive',
             'archive_path' => 'archives/inactive-preview.pdf',
+            'archive_disk' => 'public',
             'archive_type' => 'pdf',
             'archive_branch_office' => $user->branch_office_id,
             'archive_date' => '2026-04-12',
@@ -111,7 +113,7 @@ class LegacyInactiveArchivesPageTest extends TestCase
             ->assertSee('Preview Arsip')
             ->assertSee('data-siardi-pdf-preview', false)
             ->assertSee('data-role="canvas"', false)
-            ->assertSee('/storage/archives/inactive-preview.pdf', false)
+            ->assertSee(route('archives.file.show', $archive), false)
             ->assertSee('Fit Width');
     }
 

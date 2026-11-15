@@ -70,4 +70,15 @@ class LegacyReferenceSuggestionParserTest extends TestCase
         $this->assertSame('', $suggestions['savings_alt_account_no']);
         $this->assertSame('', $suggestions['loan_alt_account_no']);
     }
+
+    public function test_it_parses_original_filename_instead_of_generated_storage_name(): void
+    {
+        $suggestions = app(LegacyReferenceSuggestionParser::class)->suggestionsForArchive(new Archive([
+            'archive_name' => 'Debitur',
+            'archive_path' => '01k7c2v3m4n5p6q7r8s9t0w1x2.pdf',
+            'archive_original_name' => '12.345.67890 - kredit.pdf',
+        ]));
+
+        $this->assertSame('1234567890', $suggestions['loan_alt_account_no']);
+    }
 }
