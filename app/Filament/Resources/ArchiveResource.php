@@ -263,6 +263,8 @@ class ArchiveResource extends Resource
                                 TextEntry::make('archive_code')->label('Kode Arsip')->placeholder('-'),
                                 TextEntry::make('category.category_name')->label('Kategori Arsip'),
                                 TextEntry::make('branchOffice.branch_name')->label('Cabang')->placeholder('-'),
+                                // archive_user is NULL when the uploader account was deleted (FK nullOnDelete).
+                                TextEntry::make('user.name')->label('Diunggah Oleh')->placeholder('-'),
                                 TextEntry::make('archive_date')
                                     ->label('Tanggal Arsip')
                                     ->formatStateUsing(fn ($state): string => static::formatDateValue($state)),

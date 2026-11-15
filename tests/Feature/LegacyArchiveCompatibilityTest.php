@@ -155,6 +155,8 @@ class LegacyArchiveCompatibilityTest extends TestCase
             ->get("/arsip_digital/archives/{$archive->id}")
             ->assertOk()
             ->assertSee('PDF.js Archive View')
+            ->assertSee('Diunggah Oleh')
+            ->assertSee($user->name)
             ->assertSee('data-siardi-pdf-preview', false)
             ->assertSee('data-role="canvas"', false)
             ->assertSee(route('archives.file.show', $archive), false)
