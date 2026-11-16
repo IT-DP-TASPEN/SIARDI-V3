@@ -467,6 +467,15 @@ class ArchiveFileLifecycleTest extends TestCase
         $this->assertStringContainsString("#{$gone->id}", $zip->getFromName('_missing.txt'));
         $zip->close();
 
+        // An existing but unreadable file is skipped instead of breaking the whole zip.
+        $locked = $this->makeArchive($user, 'terkunci.pdf', 'X');
+        chmod(Storage::disk('archives')->path($locked->archive_path), 0);
+        $zip->open($this->actingAs($user)->get(route('archives.file.bulk-download', ['ids' => [$a->id, $locked->id]]))->baseResponse->getFile()->getPathname());
+        $this->assertSame('A', $zip->getFromName('laporan.pdf'));
+        $this->assertFalse($zip->getFromName('terkunci.pdf'));
+        $this->assertStringContainsString("#{$locked->id}", $zip->getFromName('_missing.txt'));
+        $zip->close();
+
         $tooMany = range(1, 101);
         $this->actingAs($user)->get(route('archives.file.bulk-download', ['ids' => $tooMany]))->assertSessionHasErrors('ids');
     }

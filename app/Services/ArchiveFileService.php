@@ -179,13 +179,17 @@ class ArchiveFileService
             && Gate::forUser($user)->allows('view', $archive));
 
         foreach ($archives as $archive) {
-            if (! $this->exists($archive, 'bulk_download')) {
+            // exists() is only is_file(); ZipArchive reads on close(), so one unreadable file would sink the whole zip.
+            $path = $this->exists($archive, 'bulk_download') ? $this->disk($archive)->path($archive->archive_path) : null;
+
+            if ($path === null || ! is_readable($path)) {
+                $this->logFailure('bulk_download', 'Archive file is missing or unreadable.', $archive, level: 'warning');
                 $missing[] = "#{$archive->getKey()} {$archive->archive_name} (file tidak ditemukan)";
 
                 continue;
             }
 
-            $zip->addFile($this->disk($archive)->path($archive->archive_path), $this->uniqueName($this->displayName($archive), $used));
+            $zip->addFile($path, $this->uniqueName($this->displayName($archive), $used));
             $added[] = $archive->getKey();
         }
 
@@ -198,7 +202,11 @@ class ArchiveFileService
             $zip->addFromString('_missing.txt', "Tidak ada arsip dipilih.\n");
         }
 
-        $zip->close();
+        if (! $zip->close()) {
+            @unlink($zipPath);
+
+            throw new RuntimeException('Failed to write bulk download zip.');
+        }
 
         Log::info('Archive bulk download', [
             'user_id' => $user->getKey(),
