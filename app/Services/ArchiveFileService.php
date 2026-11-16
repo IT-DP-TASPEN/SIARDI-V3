@@ -3,15 +3,20 @@
 namespace App\Services;
 
 use App\Models\Archive;
+use App\Models\User;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
+use ZipArchive;
 
 /**
  * Owns the physical lifecycle of archive files: storing, serving, replacing,
@@ -22,6 +27,8 @@ class ArchiveFileService
     public const DISK = 'archives';
 
     public const LEGACY_DISK = 'public';
+
+    public const BULK_DOWNLOAD_LIMIT = 100;
 
     /**
      * Types a browser may render inline. Everything else is served as an attachment.
@@ -146,6 +153,85 @@ class ArchiveFileService
         $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;
+    }
+
+    /**
+     * Zip the archives the user may view; unreadable or missing ones are listed in _missing.txt.
+     *
+     * @param  Collection<int, Archive>  $archives
+     */
+    public function zipResponse(Collection $archives, User $user): BinaryFileResponse
+    {
+        $visibility = app(ArchiveVisibilityService::class);
+        $zipPath = tempnam(sys_get_temp_dir(), 'siardi-zip-');
+        $zip = new ZipArchive;
+
+        if ($zip->open($zipPath, ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException('Cannot create temporary zip file.');
+        }
+
+        $used = ['_missing.txt' => true];
+        $missing = [];
+        $added = [];
+
+        // Invisible archives are dropped silently, like the single-file 404, so ids can't be probed.
+        $archives = $archives->filter(fn (Archive $archive): bool => $visibility->canViewArchive($user, $archive)
+            && Gate::forUser($user)->allows('view', $archive));
+
+        foreach ($archives as $archive) {
+            if (! $this->exists($archive, 'bulk_download')) {
+                $missing[] = "#{$archive->getKey()} {$archive->archive_name} (file tidak ditemukan)";
+
+                continue;
+            }
+
+            $zip->addFile($this->disk($archive)->path($archive->archive_path), $this->uniqueName($this->displayName($archive), $used));
+            $added[] = $archive->getKey();
+        }
+
+        if ($missing !== []) {
+            $zip->addFromString('_missing.txt', implode("\n", $missing)."\n");
+        }
+
+        // An empty ZipArchive is not written on close(); keep the response a valid (empty) zip.
+        if ($added === [] && $missing === []) {
+            $zip->addFromString('_missing.txt', "Tidak ada arsip dipilih.\n");
+        }
+
+        $zip->close();
+
+        Log::info('Archive bulk download', [
+            'user_id' => $user->getKey(),
+            'archive_ids' => $added,
+            'skipped' => count($missing),
+        ]);
+
+        $response = response()
+            ->download($zipPath, 'arsip-'.now()->format('Ymd-His').'.zip', ['Content-Type' => 'application/zip'])
+            ->deleteFileAfterSend();
+
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
+    }
+
+    /**
+     * @param  array<string, true>  $used
+     */
+    private function uniqueName(string $name, array &$used): string
+    {
+        $name = str_replace(['/', '\\'], '_', $name);
+        $base = pathinfo($name, PATHINFO_FILENAME);
+        $ext = pathinfo($name, PATHINFO_EXTENSION);
+        $candidate = $name;
+
+        for ($i = 2; isset($used[strtolower($candidate)]); $i++) {
+            $candidate = "{$base} ({$i})".($ext !== '' ? ".{$ext}" : '');
+        }
+
+        $used[strtolower($candidate)] = true;
+
+        return $candidate;
     }
 
     /**

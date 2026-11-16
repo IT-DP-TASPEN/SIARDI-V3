@@ -427,6 +427,50 @@ class ArchiveFileLifecycleTest extends TestCase
             && $context['exception_class'] === QueryException::class);
     }
 
+    public function test_bulk_download_zips_visible_files_and_lists_skipped_ones(): void
+    {
+        $user = $this->makeUser('kearsipan');
+        $a = $this->makeArchive($user, 'laporan.pdf', 'A');
+        $b = $this->makeArchive($user, 'laporan.pdf', 'B');
+        $gone = $this->makeArchive($user, 'hilang.pdf');
+        Storage::disk('archives')->delete($gone->archive_path);
+        $otherBranch = BranchOffice::query()->create(['branch_code' => '02', 'branch_name' => 'KC Bogor']);
+        $forbidden = $this->makeArchive($user, 'rahasia.pdf');
+        $forbidden->update(['archive_branch_office' => $otherBranch->id]);
+
+        Livewire::actingAs($user)
+            ->test(ListArchives::class)
+            ->callTableBulkAction('downloadZip', [$a, $b, $gone, $forbidden])
+            ->assertRedirectContains('/arsip_digital/archive-files/bulk-download?');
+
+        // The forbidden id is crafted directly: the table scope already hides it, the route must too.
+
+        $response = $this->actingAs($user)->get(route('archives.file.bulk-download', ['ids' => [$a->id, $b->id, $gone->id, $forbidden->id]]));
+        $response->assertOk()->assertHeader('Content-Type', 'application/zip');
+
+        $zip = new \ZipArchive;
+        $zip->open($response->baseResponse->getFile()->getPathname());
+        $this->assertSame('A', $zip->getFromName('laporan.pdf'));
+        $this->assertSame('B', $zip->getFromName('laporan (2).pdf'));
+        $missing = $zip->getFromName('_missing.txt');
+        $this->assertStringContainsString("#{$gone->id}", $missing);
+        $this->assertStringNotContainsString("#{$forbidden->id} ", $missing);
+        $this->assertStringNotContainsString('rahasia', $missing);
+        $this->assertFalse($zip->getFromName('rahasia.pdf'));
+        $this->assertSame(3, $zip->numFiles);
+        $zip->close();
+
+        // An upload literally named _missing.txt must not be overwritten by the manifest.
+        $manifestNamed = $this->makeArchive($user, '_missing.txt', 'isi user');
+        $zip->open($this->actingAs($user)->get(route('archives.file.bulk-download', ['ids' => [$manifestNamed->id, $gone->id]]))->baseResponse->getFile()->getPathname());
+        $this->assertSame('isi user', $zip->getFromName('_missing (2).txt'));
+        $this->assertStringContainsString("#{$gone->id}", $zip->getFromName('_missing.txt'));
+        $zip->close();
+
+        $tooMany = range(1, 101);
+        $this->actingAs($user)->get(route('archives.file.bulk-download', ['ids' => $tooMany]))->assertSessionHasErrors('ids');
+    }
+
     private function createArchiveThroughForm(User $user, UploadedFile $file): Archive
     {
         Livewire::actingAs($user)

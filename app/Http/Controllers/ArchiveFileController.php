@@ -25,6 +25,16 @@ class ArchiveFileController extends Controller
         return $files->response($archive, download: true);
     }
 
+    public function bulkDownload(Request $request, ArchiveFileService $files): Response
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'max:'.ArchiveFileService::BULK_DOWNLOAD_LIMIT],
+            'ids.*' => ['integer'],
+        ])['ids'];
+
+        return $files->zipResponse(Archive::query()->whereKey($ids)->get(), $request->user());
+    }
+
     private function authorizeArchive(Request $request, Archive $archive): void
     {
         // Checked explicitly (not only via the policy) because super_admin bypasses policies via Gate::before.

@@ -15,6 +15,7 @@ use App\Support\ArchivePreviewRenderer;
 use App\Support\ReferenceNormalizer;
 use Carbon\Carbon;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -231,6 +232,24 @@ class ArchiveResource extends Resource
             ])
             ->bulkActions([
                 BulkActionGroup::make([
+                    BulkAction::make('downloadZip')
+                        ->label('Download ZIP')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records) {
+                            if ($records->count() > ArchiveFileService::BULK_DOWNLOAD_LIMIT) {
+                                Notification::make()
+                                    ->title('Terlalu banyak arsip dipilih')
+                                    ->body('Maksimal '.ArchiveFileService::BULK_DOWNLOAD_LIMIT.' arsip per download.')
+                                    ->danger()
+                                    ->send();
+
+                                return null;
+                            }
+
+                            // Plain GET route so the zip streams from disk instead of being base64'd through Livewire.
+                            return redirect()->route('archives.file.bulk-download', ['ids' => $records->modelKeys()]);
+                        }),
                     DeleteBulkAction::make()
                         ->using(function (DeleteBulkAction $action, Collection $records): void {
                             $files = app(ArchiveFileService::class);

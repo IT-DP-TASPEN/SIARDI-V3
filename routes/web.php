@@ -13,6 +13,9 @@ Route::middleware(['auth', 'can:page_RekapanArsip'])
     ->name('rekap.print');
 
 Route::middleware('auth')->group(function (): void {
+    // Registered before {archive} so "bulk-download" is not bound as an archive id.
+    Route::get('/arsip_digital/archive-files/bulk-download', [ArchiveFileController::class, 'bulkDownload'])
+        ->name('archives.file.bulk-download');
     Route::get('/arsip_digital/archive-files/{archive}', [ArchiveFileController::class, 'show'])
         ->name('archives.file.show');
     Route::get('/arsip_digital/archive-files/{archive}/download', [ArchiveFileController::class, 'download'])
